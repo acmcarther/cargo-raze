@@ -27,6 +27,4 @@ See [bazel raze](https://github.com/acmcarther/bazel-raze)
 
 ## How it works (soon!)
 
-Using `cargo-vendor` and `cargo-raze`, Bazel performs Cargo dependency vendoring, and then supplements the dependencies with BUILD files. Either step can be perfomed manually, thereby "locking" either the sources or the BUILD rules for the whole project.
-
-One important note: BUILD files are specific to the platform that `cargo-raze` is executed on. If you wish continue to leverage Cargo's platform-specific dependency resolution, you will need to defer generation of the BUILD files.
+`cargo raze` uses Cargo's own internal dependency resolution, feature flag propagation, and platform introspection to link the vendored dependencies properly for your platform.
