@@ -3,3 +3,4 @@ Cargo.lock
 bazel*
 raze/
 raze.WORKSPACE
+example
