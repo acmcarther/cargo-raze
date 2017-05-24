@@ -397,7 +397,7 @@ platform_attrs:
 
 DO NOT MODIFY! Instead, add a CargoOverride.bzl mixin.
 """
-description = {expr}"
+description = {expr}
 "#,
             name = pkg.full_name,
             platform_triple = platform_triple,

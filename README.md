@@ -89,7 +89,7 @@ description = struct(
             path = "tests/all.rs",
         ),
     ],
-)"
+)
 ```
 
 ## TODO:
