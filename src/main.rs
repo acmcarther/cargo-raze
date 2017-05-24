@@ -1,12 +1,11 @@
 extern crate cargo;
-#[macro_use]
-extern crate nom;
 extern crate rustc_serialize;
 
 use cargo::CliResult;
 use cargo::core::Dependency;
 use cargo::core::Package;
 use cargo::core::PackageId;
+use cargo::core::TargetKind;
 use cargo::core::SourceId;
 use cargo::core::Workspace;
 use cargo::core::dependency::Kind;
@@ -20,6 +19,9 @@ use cargo::util::human;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
+use std::iter;
+use std::hash::Hash;
+use std::cmp::Eq;
 use std::fs;
 use std::io::Write;
 use std::fs::File;
@@ -27,29 +29,160 @@ use std::path::Path;
 use std::str::FromStr;
 use std::str;
 
-/** Define parser for --overrides flag */
-fn isnt_plus(chr: char) -> bool { chr != '+' }
-fn isnt_colon(chr: char) -> bool { chr != ':' }
-fn isnt_comma(chr: char) -> bool { chr != ',' }
-named!(parse_override( &str ) -> DependencyOverride,
-   do_parse!(
-     name: map!(take_while_s!(isnt_plus), str::to_owned) >>
-     char!('+') >>
-     version: map!(take_while_s!(isnt_colon), str::to_owned) >>
-     char!(':') >>
-     bazel_path: map!(take_while_s!(isnt_comma), str::to_owned) >>
-     (DependencyOverride { name: name, version: version, bazel_path: bazel_path })
-   )
-);
-named!(parse_overrides( &str ) -> Vec<DependencyOverride>, separated_list!(char!(','), parse_override));
+// A basic expr type for bzl files
+pub enum BExpr {
+  Value(String),
+  Array(Vec<BExpr>),
+  Struct(Vec<(String, BExpr)>),
+}
 
-#[derive(Debug)]
-pub struct RazePackage {
+impl BExpr {
+  pub fn pretty_print(&self) -> String {
+    self.pretty_print_spaced(4 /* space_count */)
+  }
+
+  fn pretty_print_spaced(&self, space_count: usize) -> String {
+    assert!(space_count >= 4);
+    let less_spaces = iter::repeat(' ')
+      .take(if space_count > 0 { space_count - 4 } else { 0 })
+      .collect::<String>();
+    let spaces = iter::repeat(' ')
+      .take(space_count)
+      .collect::<String>();
+    match self {
+      &BExpr::Value(ref s) => format!("\"{}\"", s),
+      &BExpr::Array(ref a) if a.len() == 0 => format!("[]"),
+      &BExpr::Array(ref a) => format!("[\n{}{}]", a.iter()
+                              .map(|i| format!("{}{},\n", spaces, i.pretty_print_spaced(space_count + 4)))
+                              .collect::<String>(), less_spaces),
+      &BExpr::Struct(ref s) if s.len() == 0 => format!("struct()"),
+      &BExpr::Struct(ref s) => format!("struct(\n{}{})", s.iter()
+                              .map(|&(ref k, ref v)| format!("{}{} = {},\n", spaces, k, v.pretty_print_spaced(space_count + 4)))
+                              .collect::<String>(), less_spaces),
+    }
+  }
+}
+
+// Produces a hashmap-ish Struct BExpr
+macro_rules! b_struct {
+    ($($key:expr => $value:expr),*) => {
+        {
+            let mut contents: Vec<(String, BExpr)> = Vec::new();
+            $(
+              contents.push(($key.to_string(), $value));
+            )*
+            BExpr::Struct(contents)
+        }
+    };
+}
+
+// Produces an array-ish BExpr
+macro_rules! b_array {
+    ($($value:expr),*) => {
+        {
+            let mut contents: Vec<BExpr> = Vec::new();
+            $(
+              contents.push($value);
+            )*
+            BExpr::Array(contents)
+        }
+    };
+}
+
+// Produces a string-ish value BExpr
+macro_rules! b_value {
+    ($value:expr) => {
+      BExpr::Value($value.to_string())
+    };
+}
+
+trait ToBExpr {
+  fn to_expr(&self) -> BExpr;
+}
+
+impl <T> ToBExpr for Vec<T> where T: ToBExpr {
+  fn to_expr(&self) -> BExpr {
+    BExpr::Array(self.iter().map(|v| v.to_expr()).collect())
+  }
+}
+impl <T> ToBExpr for HashSet<T> where T: Eq + Hash + ToBExpr {
+  fn to_expr(&self) -> BExpr {
+    BExpr::Array(self.iter().map(|v| v.to_expr()).collect())
+  }
+}
+
+impl <T> ToBExpr for HashMap<String, T> where T: ToBExpr {
+  fn to_expr(&self) -> BExpr {
+    BExpr::Struct(self.iter().map(|(k, v)| (k.clone(), v.to_expr())).collect())
+  }
+}
+
+impl ToBExpr for String {
+  fn to_expr(&self) -> BExpr {
+    b_value!(self)
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct BazelPackage {
   pub id: PackageId,
   pub package: Package,
   pub features: HashSet<String>,
+  pub full_name: String,
+  pub path: String,
+  pub dependencies: Vec<BazelDependency>,
+  pub build_dependencies: Vec<BazelDependency>,
+  pub dev_dependencies: Vec<BazelDependency>,
+  pub targets: Vec<BazelTarget>,
 }
 
+impl ToBExpr for BazelPackage {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "package" => b_struct! {
+        "pkg_name" => b_value!(self.id.name()),
+        "pkg_version" => b_value!(self.id.version())
+      },
+      "dependencies" => self.dependencies.to_expr(),
+      "build_dependencies" => self.build_dependencies.to_expr(),
+      "dev_dependencies" => self.dev_dependencies.to_expr(),
+      "features" => self.features.to_expr(),
+      "targets" => self.targets.to_expr()
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct BazelDependency {
+  pub name: String,
+  pub version: String,
+}
+
+impl ToBExpr for BazelDependency {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "name" => b_value!(self.name),
+      "version" => b_value!(self.version)
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct BazelTarget {
+  pub name: String,
+  pub kinds: Vec<String>,
+  pub path: String,
+}
+
+impl ToBExpr for BazelTarget {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "name" => b_value!(self.name),
+      "kinds" => self.kinds.to_expr(),
+      "path" => b_value!(self.path)
+    }
+  }
+}
 
 #[derive(RustcDecodable)]
 struct Options {
@@ -57,18 +190,10 @@ struct Options {
     flag_quiet: Option<bool>,
     flag_host: Option<String>,
     flag_color: Option<String>,
-    flag_overrides: Option<String>
-}
-
-#[derive(Debug)]
-struct DependencyOverride {
-    pub name: String,
-    pub version: String,
-    pub bazel_path: String,
 }
 
 const USAGE: &'static str = r#"
-Generate BUILD files for your pre-vendored Cargo dependencies.
+Generate Cargo.bzl files for your pre-vendored Cargo dependencies.
 
 Usage:
     cargo raze [options]
@@ -79,7 +204,6 @@ Options:
     --host HOST              Registry index to sync with
     -q, --quiet              No output printed to stdout
     --color WHEN             Coloring: auto, always, never
-    --overrides LIST         Comma separated cargo dependency overrides ["libc+0.2.21:@workspace//path:dep,..."]
 "#;
 
 fn main() {
@@ -100,16 +224,6 @@ fn real_main(options: Options, config: &Config) -> CliResult {
                           /* frozen = */ false,
                           /* locked = */ false));
     let platform_triple = config.rustc()?.host.clone();
-    // TODO(acmcarther): Fix unwrap. I'm unwrapping here temporarily because Nom's err is hard to
-    // convert to CargoError
-    let override_name_and_ver_to_path: HashMap<(String, String), String> = {
-        options.flag_overrides.as_ref()
-            .map(|f| parse_overrides(f).to_result().unwrap())
-            .unwrap_or(Vec::new())
-            .into_iter()
-            .map(|entry| ((entry.name, entry.version), entry.bazel_path))
-            .collect()
-    };
 
     let (packages, resolve) = {
         let lockfile = Path::new("Cargo.lock");
@@ -148,128 +262,156 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         package_ids
     };
 
-    let raze_packages = package_ids.iter()
-      .filter(|id| !override_name_and_ver_to_path.contains_key(&(id.name().to_owned(), id.version().to_string())))
-      .map(|id| RazePackage {
+    let mut raze_packages = package_ids.iter()
+      .map(|id| BazelPackage {
           id: id.clone(),
           package: packages.get(id).unwrap().clone(),
+          full_name: format!("{}-{}", id.name(), id.version()),
+          path: format!("./vendor/{}-{}/", id.name(), id.version()),
           // TODO(acmcarther): This will break as of cargo commit 50f1c172
           features: resolve.features(id)
             .cloned()
-            .unwrap_or(HashSet::new())})
+            .unwrap_or(HashSet::new()),
+          dependencies: Vec::new(),
+          build_dependencies: Vec::new(),
+          dev_dependencies: Vec::new(),
+          targets: Vec::new(),
+      })
       .collect::<Vec<_>>();
 
-    let mut has_build_dependency = false;
-
+    // Verify that the package is already vendored
     for pkg in raze_packages.iter() {
-        let &RazePackage {ref id, ref features, ref package, ..} = pkg;
-        let vendor_dir = format!("./vendor/{}-{}/", id.name(), id.version());
-
-        try!(fs::metadata(&vendor_dir).chain_error(|| {
-            human(format!("failed to find {}. Please run `cargo vendor -x` first.", vendor_dir))
+        try!(fs::metadata(&pkg.path).chain_error(|| {
+            human(format!("failed to find {}. Please run `cargo vendor -x` first.", pkg.path))
         }));
+    }
 
-        let vendor_path = Path::new(&vendor_dir);
+    // Determine targets
+    for mut pkg in raze_packages.iter_mut() {
+        let &mut BazelPackage {
+          ref full_name,
+          ref package,
+          ref mut targets, ..} = pkg;
+        let partial_path = format!("{}/", full_name);
+        let partial_path_byte_length = partial_path.as_bytes().len();
 
-        let normal_dependencies = package.dependencies().iter().cloned()
-            .filter(|dep| {
-                if dep.kind() == Kind::Normal {
-                    return true;
-                }
+        for target in package.targets().iter() {
+            let target_path_str = target.src_path().to_str()
+              .expect("path wasn't unicode")
+              .to_owned();
+            let crate_name_str_idx = target_path_str.find(&partial_path)
+              .expect("target path should have been in vendor directory");
+            let local_path_bytes = target_path_str.bytes()
+              .skip(crate_name_str_idx + partial_path_byte_length)
+              .collect::<Vec<_>>();
+            let local_path = String::from_utf8(local_path_bytes)
+              .expect("source string was corrupted while slicing");
 
-                println!("WARNING: Crate <{}> is dropping <{:?}> dependency <{}>",
-                         id.name(), dep.kind(), dep.name());
+            targets.push(BazelTarget {
+              name: target.name().to_owned(),
+              path: local_path,
+              kinds: kind_to_kinds(target.kind()),
+            });
+        }
+    }
 
-                if dep.kind() == Kind::Build {
-                  has_build_dependency = true;
-                }
+    let platform_attrs = generic_linux_cfgs();
 
-                return false;
-            })
+    // Determine exact dependencies per package
+    for mut pkg in raze_packages.iter_mut() {
+        let &mut BazelPackage {
+          ref id,
+          ref package,
+          ref mut dependencies,
+          ref mut build_dependencies,
+          ref mut dev_dependencies, ..} = pkg;
+
+        let concrete_dependencies = package.dependencies().iter()
+            .filter(|dep| dep.platform().map(|p| p.matches(&platform_triple, Some(&platform_attrs))).unwrap_or(true))
+            .cloned()
             .collect::<Vec<_>>();
 
-        let package_dependencies_by_name = normal_dependencies.into_iter()
-            .map(|dep| (dep.name().to_owned(), dep))
+        let normal_dependencies_by_name = concrete_dependencies.iter()
+            .filter(|dep| dep.kind() == Kind::Normal)
+            .map(|dep| (dep.name().to_owned(), dep.clone()))
             .collect::<HashMap<String, Dependency>>();
 
-        let resolved_dependencies_by_name = resolve.deps(id).into_iter()
+        let dev_dependencies_by_name = concrete_dependencies.iter()
+            .filter(|dep| dep.kind() == Kind::Development)
+            .map(|dep| (dep.name().to_owned(), dep.clone()))
+            .collect::<HashMap<String, Dependency>>();
+
+        let build_dependencies_by_name = concrete_dependencies.iter()
+            .filter(|dep| dep.kind() == Kind::Build)
+            .map(|dep| (dep.name().to_owned(), dep.clone()))
+            .collect::<HashMap<String, Dependency>>();
+
+        let planned_dependencies_by_name = resolve.deps(id).into_iter()
             .map(|dep| (dep.name().to_owned(), dep.clone()))
             .collect::<HashMap<String, PackageId>>();
 
-        let all_dependencies = package_dependencies_by_name.keys().cloned()
-            .chain(resolved_dependencies_by_name.keys().cloned())
+        let all_dependency_names = planned_dependencies_by_name.keys().cloned()
+            .chain(normal_dependencies_by_name.keys().cloned())
+            .chain(dev_dependencies_by_name.keys().cloned())
+            .chain(build_dependencies_by_name.keys().cloned())
             .collect::<HashSet<_>>();
 
-        let mut bazel_dependency_strs = Vec::new();
-        for dependency_name in all_dependencies.iter() {
-            if !resolved_dependencies_by_name.contains_key(dependency_name) {
-                println!("TRACE: Crate <{}> is dropping <{}> because it is unused.",
-                         id.name(), dependency_name);
+        for dependency_name in all_dependency_names.iter() {
+            if !planned_dependencies_by_name.contains_key(dependency_name) {
+                // TODO(acmcarther): Identify why this is removing most dev dependencies
+                //println!("TRACE: Crate <{}> is omitting concrete dependency <{}> because it is unused.",
+                //         id.name(), dependency_name);
                 continue
             }
-            if !package_dependencies_by_name.contains_key(dependency_name) {
-                // Dropped dependency because it was not a Normal dependency
-                continue
-            }
-            let resolved_dependency = resolved_dependencies_by_name.get(dependency_name).unwrap();
-            let package_dependency = package_dependencies_by_name.get(dependency_name).unwrap();
-
-            let dependency_version = resolved_dependency.version();
-            let dependency_override = override_name_and_ver_to_path
-                .get(&(dependency_name.to_owned(), dependency_version.to_string()));
-
-            let platform_requires_dependency = package_dependency.platform()
-              .map(|p| p.matches(&platform_triple, Some(&generic_linux_cfgs())))
-              .unwrap_or(true);
-            if !platform_requires_dependency {
-                println!("INFO: Crate <{}> is dropping <{}> because it is not for this plaform.",
-                         id.name(), dependency_name);
-                println!("INFO: Dependency <{}>'s target specification is <{:?}>",
-                         dependency_name, package_dependency.platform().unwrap());
-                continue
-            }
-
-            let bazel_dependency_path = match dependency_override {
-                Some(override_path) => override_path.clone(),
-                None => format!("//vendor/{name}-{crate_version}:{sanitized_name}",
-                  name=dependency_name, sanitized_name=dependency_name.replace("-", "_"),
-                  crate_version=resolved_dependency.version())
+            let planned_dependency = planned_dependencies_by_name.get(dependency_name).unwrap();
+            let bazel_dependency = BazelDependency {
+                name: dependency_name.clone(),
+                version: planned_dependency.version().to_string(),
             };
-            bazel_dependency_strs.push(bazel_dependency_path);
+
+            if let Some(_) = dev_dependencies_by_name.get(dependency_name) {
+                dev_dependencies.push(bazel_dependency.clone());
+            }
+
+            if let Some(_) = build_dependencies_by_name.get(dependency_name) {
+                build_dependencies.push(bazel_dependency.clone());
+            }
+
+            if let Some(_) = normal_dependencies_by_name.get(dependency_name) {
+                dependencies.push(bazel_dependency);
+            }
         }
-
-        let sanitized_crate_name = id.name().replace("-", "_");
-        let mut comma_separated_deps = bazel_dependency_strs.into_iter()
-            .map(|dep_str| format!("        \"{}\",\n", dep_str))
-            .collect::<Vec<String>>();
-        comma_separated_deps.sort();
-        let mut comma_separated_features = features
-            .iter()
-            .map(|f| format!("        \"{}\",\n", f))
-            .collect::<Vec<String>>();
-        comma_separated_features.sort();
-
-        let comma_separated_deps_str =
-            comma_separated_deps.into_iter().collect::<String>();
-        let comma_separated_features_str =
-            comma_separated_features.into_iter().collect::<String>();
-
-        let build_file_content = generate_build_file(
-            &sanitized_crate_name,
-            &comma_separated_deps_str,
-            &comma_separated_features_str);
-
-        let build_file_path = vendor_path.join("BUILD");
-        try!(File::create(&build_file_path)
-            .and_then(|mut f| f.write_all(build_file_content.as_bytes()))
-            .chain_error(|| human(format!("failed to create: `{}`", build_file_path.display()))));
-    }
-    let workspace_path = Path::new("WORKSPACE");
-    if fs::metadata(&workspace_path).is_err() {
-      try!(File::create(&workspace_path)
-          .chain_error(|| human(format!("failed to create: `{}`", workspace_path.display()))));
     }
 
+    let platform_attrs_pretty = platform_attrs.iter().map(cfg_pretty).collect::<Vec<_>>();
+
+    for pkg in raze_packages.into_iter() {
+        let file_contents = format!(
+r#""""
+cargo-raze generated details for {name}.
+
+Generated for:
+platform_triple: {platform_triple}
+platform_attrs:
+{platform_attrs:#?}
+
+DO NOT MODIFY! Instead, add a CargoOverride.bzl mixin.
+"""
+description = {expr}"
+"#,
+            name = pkg.full_name,
+            platform_triple = platform_triple,
+            platform_attrs = platform_attrs_pretty,
+            expr = pkg.to_expr().pretty_print());
+
+        let cargo_bzl_path = format!("{}Cargo.bzl", &pkg.path);
+        try!(File::create(&cargo_bzl_path)
+             .and_then(|mut f| f.write_all(file_contents.as_bytes()))
+             .chain_error(|| human(format!("failed to create {}", cargo_bzl_path))));
+        println!("Generated {} successfully", cargo_bzl_path);
+    }
+
+    println!("All done!");
     Ok(())
 }
 
@@ -301,42 +443,21 @@ unix"#;
       .collect()
 }
 
+fn cfg_pretty(cfg: &Cfg) -> String {
+    match cfg {
+        &Cfg::Name(ref s) => s.clone(),
+        &Cfg::KeyPair(ref k, ref v) => format!("{}: {}", k, v)
+    }
+}
 
-pub fn generate_build_file(
-        sanitized_crate_name: &str,
-        comma_separated_deps: &String,
-        comma_separated_features: &String) -> String {
-    format!(r#"'''
-WARNING: THIS IS GENERATED CODE!
-DO NOT MODIFY!
-Instead, rerun raze with different arguments.
-'''
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_rust//rust:rust.bzl",
-    "rust_library",
-)
-
-filegroup(
-    name = "sources",
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-)
-
-rust_library(
-    name = "{sanitized_crate_name}",
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-    deps = [
-{comma_separated_deps}    ],
-    rustc_flags = [
-        "--cap-lints warn",
-    ],
-    crate_features = [
-{comma_separated_features}    ],
-)"#,
-        sanitized_crate_name=sanitized_crate_name,
-        comma_separated_deps=comma_separated_deps,
-        comma_separated_features=comma_separated_features)
+// TODO(acmcarther): Remove this shim from cargo when Cargo is upgraded
+fn kind_to_kinds(kind: &TargetKind) -> Vec<String> {
+    match kind {
+        &TargetKind::Lib(ref kinds) => kinds.iter().map(|k| k.crate_type().to_owned()).collect(),
+        &TargetKind::Bin => vec!["bin".to_owned()],
+        &TargetKind::ExampleBin | &TargetKind::ExampleLib(_) => vec!["example".to_owned()],
+        &TargetKind::Test => vec!["test".to_owned()],
+        &TargetKind::CustomBuild => vec!["custom-build".to_owned()],
+        &TargetKind::Bench => vec!["bench".to_owned()],
+    }
 }
