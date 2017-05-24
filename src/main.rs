@@ -385,7 +385,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
 
     let platform_attrs_pretty = platform_attrs.iter().map(cfg_pretty).collect::<Vec<_>>();
 
-    for pkg in raze_packages.into_iter() {
+    for pkg in raze_packages.iter() {
         let file_contents = format!(
 r#""""
 cargo-raze generated details for {name}.
@@ -409,6 +409,28 @@ description = {expr}
              .and_then(|mut f| f.write_all(file_contents.as_bytes()))
              .chain_error(|| human(format!("failed to create {}", cargo_bzl_path))));
         println!("Generated {} successfully", cargo_bzl_path);
+    }
+
+    for pkg in raze_packages.iter() {
+        let file_contents = format!(
+r#""""
+cargo-raze details override for {name}.
+
+Make your changes here. Bazel automatically integrates overrides from this
+file and will not overwrite it on a rerun of cargo-raze.
+"""
+override = struct()
+"#, name = pkg.full_name);
+
+        let cargo_override_bzl_path = format!("{}CargoOverride.bzl", &pkg.path);
+        if fs::metadata(&cargo_override_bzl_path).is_ok() {
+          // File exists, skip
+          continue
+        }
+        try!(File::create(&cargo_override_bzl_path)
+             .and_then(|mut f| f.write_all(file_contents.as_bytes()))
+             .chain_error(|| human(format!("failed to create {}", cargo_override_bzl_path))));
+        println!("Generated {} successfully", cargo_override_bzl_path);
     }
 
     println!("All done!");
