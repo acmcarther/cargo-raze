@@ -2,7 +2,6 @@ extern crate cargo;
 #[macro_use]
 extern crate nom;
 extern crate rustc_serialize;
-extern crate itertools;
 
 use cargo::CliResult;
 use cargo::core::Dependency;
@@ -160,22 +159,36 @@ fn real_main(options: Options, config: &Config) -> CliResult {
             .unwrap_or(HashSet::new())})
       .collect::<Vec<_>>();
 
+    let mut has_build_dependency = false;
+
     for pkg in raze_packages.iter() {
         let &RazePackage {ref id, ref features, ref package, ..} = pkg;
-        let vendor_dir = format!("./{}-{}/", id.name(), id.version());
+        let vendor_dir = format!("./vendor/{}-{}/", id.name(), id.version());
 
         try!(fs::metadata(&vendor_dir).chain_error(|| {
-            human(format!("failed to find {}. Please run `cargo vendor -x .` first.", vendor_dir))
+            human(format!("failed to find {}. Please run `cargo vendor -x` first.", vendor_dir))
         }));
 
         let vendor_path = Path::new(&vendor_dir);
 
-        if package.dependencies().iter().any(|dep| dep.kind() == Kind::Build) {
-            println!("WARNING: Crate <{}-{}> appears to contain a Build dependency.",
-                id.name(), id.version());
-        }
+        let normal_dependencies = package.dependencies().iter().cloned()
+            .filter(|dep| {
+                if dep.kind() == Kind::Normal {
+                    return true;
+                }
 
-        let package_dependencies_by_name = package.dependencies().iter().cloned()
+                println!("WARNING: Crate <{}> is dropping <{:?}> dependency <{}>",
+                         id.name(), dep.kind(), dep.name());
+
+                if dep.kind() == Kind::Build {
+                  has_build_dependency = true;
+                }
+
+                return false;
+            })
+            .collect::<Vec<_>>();
+
+        let package_dependencies_by_name = normal_dependencies.into_iter()
             .map(|dep| (dep.name().to_owned(), dep))
             .collect::<HashMap<String, Dependency>>();
 
@@ -190,26 +203,25 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         let mut bazel_dependency_strs = Vec::new();
         for dependency_name in all_dependencies.iter() {
             if !resolved_dependencies_by_name.contains_key(dependency_name) {
+                println!("TRACE: Crate <{}> is dropping <{}> because it is unused.",
+                         id.name(), dependency_name);
+                continue
+            }
+            if !package_dependencies_by_name.contains_key(dependency_name) {
+                // Dropped dependency because it was not a Normal dependency
                 continue
             }
             let resolved_dependency = resolved_dependencies_by_name.get(dependency_name).unwrap();
-            assert!(package_dependencies_by_name.contains_key(dependency_name));
             let package_dependency = package_dependencies_by_name.get(dependency_name).unwrap();
 
             let dependency_version = resolved_dependency.version();
             let dependency_override = override_name_and_ver_to_path
                 .get(&(dependency_name.to_owned(), dependency_version.to_string()));
 
-            if package_dependency.kind() != Kind::Normal {
-                println!("WARNING: Crate <{}> is dropping <{:?}> dependency <{}>",
-                         id.name(), package_dependency.kind(), dependency_name);
-                continue
-            }
-
             let platform_requires_dependency = package_dependency.platform()
               .map(|p| p.matches(&platform_triple, Some(&generic_linux_cfgs())))
               .unwrap_or(true);
-            if platform_requires_dependency {
+            if !platform_requires_dependency {
                 println!("INFO: Crate <{}> is dropping <{}> because it is not for this plaform.",
                          id.name(), dependency_name);
                 println!("INFO: Dependency <{}>'s target specification is <{:?}>",
@@ -219,8 +231,8 @@ fn real_main(options: Options, config: &Config) -> CliResult {
 
             let bazel_dependency_path = match dependency_override {
                 Some(override_path) => override_path.clone(),
-                None => format!("//{sanitized_name}-{crate_version}:{sanitized_name}",
-                  sanitized_name=dependency_name.replace("-", "_"),
+                None => format!("//vendor/{name}-{crate_version}:{sanitized_name}",
+                  name=dependency_name, sanitized_name=dependency_name.replace("-", "_"),
                   crate_version=resolved_dependency.version())
             };
             bazel_dependency_strs.push(bazel_dependency_path);
@@ -253,8 +265,10 @@ fn real_main(options: Options, config: &Config) -> CliResult {
             .chain_error(|| human(format!("failed to create: `{}`", build_file_path.display()))));
     }
     let workspace_path = Path::new("WORKSPACE");
-    try!(File::create(&workspace_path)
-        .chain_error(|| human(format!("failed to create: `{}`", workspace_path.display()))));
+    if fs::metadata(&workspace_path).is_err() {
+      try!(File::create(&workspace_path)
+          .chain_error(|| human(format!("failed to create: `{}`", workspace_path.display()))));
+    }
 
     Ok(())
 }
@@ -304,6 +318,11 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
     "rust_library",
+)
+
+filegroup(
+    name = "sources",
+    srcs = glob(["lib.rs", "src/**/*.rs"]),
 )
 
 rust_library(

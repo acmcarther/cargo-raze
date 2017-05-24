@@ -4,3 +4,4 @@ bazel*
 raze/
 raze.WORKSPACE
 example
+vendor/
