@@ -1,5 +1,2 @@
 target
 bazel*
-raze/
-raze.WORKSPACE
-example
