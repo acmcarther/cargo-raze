@@ -18,8 +18,8 @@ In your Bazel WORKSPACE:
 ```python
 git_repository(
     name = "io_bazel_rules_raze",
-    remote = "https://github.com/acmcarther/bazel-raze.git",
-    commit = "93dfb2a"
+    remote = "https://github.com/acmcarther/cargo-raze.git",
+    commit = "c84e361"
 )
 
 git_repository(
