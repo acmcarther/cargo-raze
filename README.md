@@ -38,11 +38,11 @@ cargo install cargo-vendor
 cargo install cargo-raze
 cargo generate_lockfile
 cargo vendor -x
-cargo raze
+cargo raze "//path/to/vendor"
 ```
-You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to link your dependencies up.
+You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to link your dependencies up. You will also get starter BUILD files that reference those .bzl files.
 
-Then, see the [example](examples/hello_cargo_library/README.md). Remember to replace references to `//raze:raze.bzl` with `@io_bazel_rules_raze//raze:raze.bzl`.
+See the [example](examples/hello_cargo_library/README.md) for further details.
 
 ## Project Structure
 

@@ -441,7 +441,7 @@ override = struct()
       let build_stub_contents = format!(
 r#"package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 
-load("//raze:raze.bzl", "cargo_library")
+load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
 load(":Cargo.bzl", "description")
 load(":CargoOverride.bzl", "override")
 
