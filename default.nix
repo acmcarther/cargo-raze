@@ -1,3 +1,5 @@
+# This is a Nix workspace file. It supplies os dependencies.
+# If you don't already know how to use it, you probably don't need to worry about it.
 with (import <nixpkgs> {});
 let
   pkgs = import <nixpkgs> {};

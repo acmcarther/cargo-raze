@@ -184,8 +184,9 @@ impl ToBExpr for BazelTarget {
   }
 }
 
-#[derive(RustcDecodable)]
+#[derive(Debug, RustcDecodable)]
 struct Options {
+    arg_buildprefix: Option<String>,
     flag_verbose: u32,
     flag_quiet: Option<bool>,
     flag_host: Option<String>,
@@ -196,7 +197,7 @@ const USAGE: &'static str = r#"
 Generate Cargo.bzl files for your pre-vendored Cargo dependencies.
 
 Usage:
-    cargo raze [options]
+    cargo raze [options] [<buildprefix>]
 
 Options:
     -h, --help               Print this message
@@ -385,6 +386,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
 
     let platform_attrs_pretty = platform_attrs.iter().map(cfg_pretty).collect::<Vec<_>>();
 
+    // Generate Cargo.bzl files
     for pkg in raze_packages.iter() {
         let file_contents = format!(
 r#""""
@@ -411,6 +413,7 @@ description = {expr}
         println!("Generated {} successfully", cargo_bzl_path);
     }
 
+    // Generate CargoOverride.bzl file if they don't already exist
     for pkg in raze_packages.iter() {
         let file_contents = format!(
 r#""""
@@ -431,6 +434,36 @@ override = struct()
              .and_then(|mut f| f.write_all(file_contents.as_bytes()))
              .chain_error(|| human(format!("failed to create {}", cargo_override_bzl_path))));
         println!("Generated {} successfully", cargo_override_bzl_path);
+    }
+
+    // Generate BUILD file if they don't already exist and the flag is set
+    if let Some(workspace_prefix) = options.arg_buildprefix {
+      let build_stub_contents = format!(
+r#"package(default_visibility = ["{workspace_prefix}:__subpackages__"])
+
+load("//raze:raze.bzl", "cargo_library")
+load(":Cargo.bzl", "description")
+load(":CargoOverride.bzl", "override")
+
+cargo_library(
+    srcs = glob(["lib.rs", "src/**/*.rs"]),
+    cargo_bzl = description,
+    cargo_override_bzl = override,
+    workspace_path = "{workspace_prefix}/"
+)
+"#, workspace_prefix = workspace_prefix);
+      for pkg in raze_packages.iter() {
+        let build_stub_path = format!("{}BUILD", &pkg.path);
+        if fs::metadata(&build_stub_path).is_ok() {
+          println!("Skipping existing file {}", build_stub_path);
+          // File exists, skip
+          continue
+        }
+        try!(File::create(&build_stub_path)
+             .and_then(|mut f| f.write_all(build_stub_contents.as_bytes()))
+             .chain_error(|| human(format!("failed to create {}", build_stub_path))));
+        println!("Generated {} successfully", build_stub_path);
+      }
     }
 
     println!("All done!");
