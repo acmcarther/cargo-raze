@@ -8,28 +8,11 @@
 3. Generate a Cargo.toml with desired dependencies
 4. Run `cargo generate-lockfile`
 5. Run `cargo vendor -x` (the -x forces versioning)
-6. Run `cargo raze`
+6. Run `cargo raze //examples/hello_cargo_library/vendor`
 
-At this point you will have a dependency specification that Bazel can understand. Next, a bit of boilerplate is added as BUILD files for each rule.
+At this point you will have a dependency specification that Bazel can understand. You will also have starter BUILD files that referene the specified dependencies and generate rust_library rules.
 
-```python
-package(default_visibility = ["//examples/hello_cargo_library/vendor:__subpackages__"])
-
-load("//raze:raze.bzl", "cargo_library")
-load(":Cargo.bzl", "description")
-load(":CargoOverride.bzl", "override")
-
-cargo_library(
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-    cargo_bzl = description,
-    cargo_override_bzl = override,
-    workspace_path = "//examples/hello_cargo_library/vendor/"
-)
-```
-
-This generates the `rust_library` declarations from the `cargo-raze` invocation's output data.
-
-To expose those dependencies, `alias` entries are created for the explicit Cargo dependencies. It is important to only expose explicit dependencies for the sake of hygiene.
+To expose those dependencies, `alias` entries are created for the explicit Cargo dependencies. It is important to only expose explicit dependencies for the sake of hygiene. This is not currently done automatically -- so remember to do this.
 
 ```python
 package(default_visibility = ["//visibility:public"])
