@@ -1,5 +1,8 @@
 # cargo raze
+
 A cargo subcommand to generate platform-specific BUILD files.
+
+Also, a bazel ruleset for using the outputs of that cargo subcommand.
 
 ## Problem
 
@@ -9,9 +12,27 @@ So far you've either stuck with Cargo and made do with `build.rs` files, or migr
 
 `cargo raze` gives you the best of both worlds: rust library downloading + resolution courtesy of Cargo with the power and scalability of Bazel.
 
-## How it looks (speculative and untested)
+## Getting Started
 
-In a directory containing 'Cargo.toml'
+In your Bazel WORKSPACE:
+```python
+git_repository(
+    name = "io_bazel_rules_raze",
+    remote = "https://github.com/acmcarther/bazel-raze.git",
+    commit = "93dfb2a"
+)
+
+git_repository(
+    name = "io_bazel_rules_rust",
+    remote = "https://github.com/acmcarther/rules_rust.git",
+    commit = "49a7345"
+)
+load("@io_bazel_rules_rust//rust:rust.bzl", "rust_repositories")
+
+rust_repositories()
+```
+
+Then, in a directory containing 'Cargo.toml'. Project root is fine:
 ```
 cargo install cargo-vendor
 cargo install cargo-raze
@@ -21,80 +42,26 @@ cargo raze
 ```
 You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to link your dependencies up.
 
-Next, visit [bazel-raze](https://github.com/acmcarther/bazel-raze) to see how to include these dependencies in your project.
+Then, see the [example](examples/hello_cargo_library/README.md). Remember to replace references to `//raze:raze.bzl` with `@io_bazel_rules_raze//raze:raze.bzl`.
 
-## How it works (soon!)
+## Project Structure
 
-`cargo raze` uses Cargo's own internal dependency resolution, feature flag propagation, and platform introspection to link the vendored dependencies properly for your platform.
+This repo is a hybrid cargo crate + Bazel Skylark ruleset. The project is structured roughly as follows:
 
-## An example generated file
-```python
-"""
-cargo-raze generated details for net2-0.2.29.
+cargo-raze crate:
+- ./Cargo.toml
+- ./Cargo.lock
+- ./src/
 
-Generated for:
-platform_triple: x86_64-unknown-linux-gnu
-platform_attrs:
-[
-    "debug_assertions",
-    "target_arch: x86_64",
-    "target_endian: little",
-    "target_env: gnu",
-    "target_family: unix",
-    "target_feature: sse",
-    "target_feature: sse2",
-    "target_has_atomic: 16",
-    "target_has_atomic: 32",
-    "target_has_atomic: 64",
-    "target_has_atomic: 8",
-    "target_has_atomic: ptr",
-    "target_os: linux",
-    "target_pointer_width: 64",
-    "target_thread_local",
-    "target_vendor: unknown",
-    "unix"
-]
+rules_raze:
+- ./WORKSPACE
+- ./examples/
+- ./raze/
 
-DO NOT MODIFY! Instead, add a CargoOverride.bzl mixin.
-"""
-description = struct(
-    package = struct(
-        pkg_name = "net2",
-        pkg_version = "0.2.29",
-    ),
-    dependencies = [
-        struct(
-            name = "cfg-if",
-            version = "0.1.0",
-        ),
-        struct(
-            name = "libc",
-            version = "0.2.22",
-        ),
-    ],
-    build_dependencies = [],
-    dev_dependencies = [],
-    features = [],
-    targets = [
-        struct(
-            name = "net2",
-            kinds = [
-                "lib",
-            ],
-            path = "src/lib.rs",
-        ),
-        struct(
-            name = "all",
-            kinds = [
-                "test",
-            ],
-            path = "tests/all.rs",
-        ),
-    ],
-)
-```
 
 ## TODO:
 
 - Proper platform detection. Currently we just use generic linux. This isn't too hard, just haven't had time.
 - Platform-agnostic generated `Cargo.bzl`. I envision mapping the existing platform-specific dependency support down to a handful of supported platforms within the bazel rule, rather than here. That lets us use bazel's `select` construct to support multiple platforms with a single rule.
+- Clean up folder structure
+- Set up dual compilation (compile raze via bazel OR via cargo). Prereq: openssl. Openssl is major pain to compile.

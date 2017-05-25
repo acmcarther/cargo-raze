@@ -1,0 +1,10 @@
+[package]
+name = "compile_with_bazel"
+version = "0.1.0"
+authors = ["Alex McArther <acmcarther@gmail.com>"]
+
+[dependencies]
+regex = "0.2.2"
+
+[lib]
+path = "fake_lib.rs"
