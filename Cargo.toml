@@ -1,6 +1,6 @@
 [package]
 name = "cargo-raze"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Alex McArther <acmcarther@gmail.com>"]
 readme = "README.md"
 keywords = ["subcommand"]
@@ -12,6 +12,4 @@ A Cargo subcommand to generate BUILD files for pre-vendored dependencies
 
 [dependencies]
 rustc-serialize = "0.3"
-nom = "2.2.0"
 cargo = "0.17.0"
-itertools = "0.6.0"

@@ -19,7 +19,9 @@ cargo generate_lockfile
 cargo vendor -x
 cargo raze
 ```
-You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to link your dependencies up
+You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to link your dependencies up.
+
+Next, visit [bazel-raze](https://github.com/acmcarther/bazel-raze) to see how to include these dependencies in your project.
 
 ## How it works (soon!)
 
@@ -94,8 +96,5 @@ description = struct(
 
 ## TODO:
 
-- Examples
-- Tests
-- The bazel half of this rule. Even though we generate handy `bzl` files, nobody's on the other end of the line to receive our configuration.
 - Proper platform detection. Currently we just use generic linux. This isn't too hard, just haven't had time.
 - Platform-agnostic generated `Cargo.bzl`. I envision mapping the existing platform-specific dependency support down to a handful of supported platforms within the bazel rule, rather than here. That lets us use bazel's `select` construct to support multiple platforms with a single rule.
