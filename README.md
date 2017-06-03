@@ -44,6 +44,8 @@ You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to lin
 
 See the [example](examples/hello_cargo_library/README.md) for further details.
 
+See my hobby project [space_coop](https://github.com/acmcarther/next_space_coop) for a real life example.
+
 ## Project Structure
 
 This repo is a hybrid cargo crate + Bazel Skylark ruleset. The project is structured roughly as follows:
