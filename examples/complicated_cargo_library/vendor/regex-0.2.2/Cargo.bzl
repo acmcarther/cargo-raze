@@ -33,24 +33,24 @@ description = struct(
     ),
     dependencies = [
         struct(
-            name = "utf8-ranges",
-            version = "1.0.0",
-        ),
-        struct(
-            name = "thread_local",
-            version = "0.3.3",
+            name = "regex-syntax",
+            version = "0.4.1",
         ),
         struct(
             name = "aho-corasick",
             version = "0.6.3",
         ),
         struct(
-            name = "regex-syntax",
-            version = "0.4.1",
+            name = "utf8-ranges",
+            version = "1.0.0",
         ),
         struct(
             name = "memchr",
             version = "1.0.1",
+        ),
+        struct(
+            name = "thread_local",
+            version = "0.3.3",
         ),
     ],
     build_dependencies = [],

@@ -479,7 +479,7 @@ override = struct(
 r#"
 alias(
     name = "{name}",
-    path = "{workspace_prefix}/{full_name}:{sanitized_name}",
+    actual = "{workspace_prefix}/{full_name}:{sanitized_name}",
 )
 "#, name = pkg.id.name(), sanitized_name = pkg.id.name().replace("-", "_"), workspace_prefix = workspace_prefix, full_name = pkg.full_name))
         .collect::<String>();
@@ -497,7 +497,6 @@ This file is overridden on runs of raze; do not add anything to it.
 If that is causing you pain, please drop a line in the cargo-raze repo.
 """
 package(default_visibility = ["//visibility:public"])
-
 {aliases}
 "#, aliases = aliases);
     let alias_file_path = "./vendor/BUILD";
