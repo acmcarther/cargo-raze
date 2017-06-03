@@ -133,6 +133,7 @@ pub struct BazelPackage {
   pub dependencies: Vec<BazelDependency>,
   pub build_dependencies: Vec<BazelDependency>,
   pub dev_dependencies: Vec<BazelDependency>,
+  pub is_root_dependency: bool,
   pub targets: Vec<BazelTarget>,
 }
 
@@ -191,6 +192,7 @@ struct Options {
     flag_quiet: Option<bool>,
     flag_host: Option<String>,
     flag_color: Option<String>,
+    flag_overwrite: Option<bool>,
 }
 
 const USAGE: &'static str = r#"
@@ -205,6 +207,7 @@ Options:
     --host HOST              Registry index to sync with
     -q, --quiet              No output printed to stdout
     --color WHEN             Coloring: auto, always, never
+    --overwrite              Overwrite any customizable files (BUILD, CargoOverride.bzl)
 "#;
 
 fn main() {
@@ -224,8 +227,11 @@ fn real_main(options: Options, config: &Config) -> CliResult {
                           &options.flag_color,
                           /* frozen = */ false,
                           /* locked = */ false));
+    let workspace_prefix = options.arg_buildprefix
+      .expect("build prefix must be specified (in the form //path/to/vendor/directory");
     let platform_triple = config.rustc()?.host.clone();
 
+    let mut spec_escape = None;
     let (packages, resolve) = {
         let lockfile = Path::new("Cargo.lock");
         let manifest_path = lockfile.parent().unwrap().join("Cargo.toml");
@@ -234,6 +240,8 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         let specs = Packages::All.into_package_id_specs(&ws).chain_error(|| {
           human("failed to find specs? whats a spec?")
         })?;
+        // TODO:
+        spec_escape = Some(specs.clone());
 
         ops::resolve_ws_precisely(
                 &ws,
@@ -245,6 +253,15 @@ fn real_main(options: Options, config: &Config) -> CliResult {
             human("failed to load pkg lockfile")
         })?
     };
+
+    // TODO: clean this up -- it was the fastest way I could think to do this.
+    let root_name = spec_escape.unwrap().iter().next().unwrap().name().to_owned();
+    let root_package_id = resolve.iter()
+      .filter(|dep| dep.name() == root_name)
+      .next()
+      .expect("root crate should be in cargo resolve")
+      .clone();
+    let root_direct_deps = resolve.deps(&root_package_id).cloned().collect::<HashSet<_>>();
 
     let package_ids = {
         let source_id_from_registry =
@@ -273,6 +290,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
           features: resolve.features(id)
             .cloned()
             .unwrap_or(HashSet::new()),
+          is_root_dependency: root_direct_deps.contains(id),
           dependencies: Vec::new(),
           build_dependencies: Vec::new(),
           dev_dependencies: Vec::new(),
@@ -413,6 +431,8 @@ description = {expr}
         println!("Generated {} successfully", cargo_bzl_path);
     }
 
+    let overwrite_existing_files = options.flag_overwrite.unwrap_or(false);
+
     // Generate CargoOverride.bzl file if they don't already exist
     for pkg in raze_packages.iter() {
         let file_contents = format!(
@@ -421,12 +441,27 @@ cargo-raze details override for {name}.
 
 Make your changes here. Bazel automatically integrates overrides from this
 file and will not overwrite it on a rerun of cargo-raze.
+
+Environment variables should be of the form
+
+("key", "value")
+
+Dependencies should be of the form
+
+struct(
+    name = "some-dependency",
+    path = "//some/depot/path",
+)
 """
-override = struct()
+override = struct(
+  rustc_flags = [],
+  environment_variables = [],
+  dependencies = []
+)
 "#, name = pkg.full_name);
 
         let cargo_override_bzl_path = format!("{}CargoOverride.bzl", &pkg.path);
-        if fs::metadata(&cargo_override_bzl_path).is_ok() {
+        if !overwrite_existing_files && fs::metadata(&cargo_override_bzl_path).is_ok() {
           // File exists, skip
           continue
         }
@@ -436,9 +471,43 @@ override = struct()
         println!("Generated {} successfully", cargo_override_bzl_path);
     }
 
+    // Generate root BUILD file with aliases to root dependencies
+    // TODO: Consider generating this via bazel and using a Packages.bzl @ root
+    let aliases = raze_packages.iter()
+        .filter(|pkg| pkg.is_root_dependency)
+        .map(|pkg| format!(
+r#"
+alias(
+    name = "{name}",
+    path = "{workspace_prefix}/{full_name}:{sanitized_name}",
+)
+"#, name = pkg.id.name(), sanitized_name = pkg.id.name().replace("-", "_"), workspace_prefix = workspace_prefix, full_name = pkg.full_name))
+        .collect::<String>();
+    let file_contents = format!(
+r#""""
+cargo-raze direct Cargo.toml dependencies.
+
+This BUILD file provides aliases to explicit cargo dependencies and is
+the only way to access vendored dependencies.
+
+If a dependency is missing, add it as an explicit root dependency and rerun raze.
+
+This file is overridden on runs of raze; do not add anything to it.
+
+If that is causing you pain, please drop a line in the cargo-raze repo.
+"""
+package(default_visibility = ["//visibility:public"])
+
+{aliases}
+"#, aliases = aliases);
+    let alias_file_path = "./vendor/BUILD";
+    try!(File::create(alias_file_path)
+         .and_then(|mut f| f.write_all(file_contents.as_bytes()))
+         .chain_error(|| human(format!("failed to create {}", alias_file_path))));
+    println!("Generated {} successfully", alias_file_path);
+
     // Generate BUILD file if they don't already exist and the flag is set
-    if let Some(workspace_prefix) = options.arg_buildprefix {
-      let build_stub_contents = format!(
+    let build_stub_contents = format!(
 r#"package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 
 load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
@@ -452,18 +521,17 @@ cargo_library(
     workspace_path = "{workspace_prefix}/"
 )
 "#, workspace_prefix = workspace_prefix);
-      for pkg in raze_packages.iter() {
-        let build_stub_path = format!("{}BUILD", &pkg.path);
-        if fs::metadata(&build_stub_path).is_ok() {
-          println!("Skipping existing file {}", build_stub_path);
-          // File exists, skip
-          continue
-        }
-        try!(File::create(&build_stub_path)
-             .and_then(|mut f| f.write_all(build_stub_contents.as_bytes()))
-             .chain_error(|| human(format!("failed to create {}", build_stub_path))));
-        println!("Generated {} successfully", build_stub_path);
+    for pkg in raze_packages.iter() {
+      let build_stub_path = format!("{}BUILD", &pkg.path);
+      if !overwrite_existing_files && fs::metadata(&build_stub_path).is_ok() {
+        println!("Skipping existing file {}", build_stub_path);
+        // File exists, skip
+        continue
       }
+      try!(File::create(&build_stub_path)
+           .and_then(|mut f| f.write_all(build_stub_contents.as_bytes()))
+           .chain_error(|| human(format!("failed to create {}", build_stub_path))));
+      println!("Generated {} successfully", build_stub_path);
     }
 
     println!("All done!");
