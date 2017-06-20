@@ -30,11 +30,12 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
           fail("Package was already set once!")
         this_override = override
       else:
-        close_overrides.push(override)
+        close_overrides.append(override)
 
     if close_overrides and not this_override:
       close_override_versions = [override.package.pkg_version for override in close_overrides]
-      print("Did not find an exact match for {}-{}, but found versions {}"
+      print(("Did not find an exact override match for {}-{}, but found versions {}."
+            + " Consider reviewing your CargoOverrides.bzl if you recently ran cargo-raze.")
             .format(package.pkg_name, package.pkg_version, close_override_versions))
 
     if this_override:
@@ -83,12 +84,16 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
                 crate_features = cargo_bzl.features
             )
 
-
             # TODO: TARGET is hardcoded here: consider using info from Cargo.bzl
             native.genrule(
                 name = name + "_build_script_executor",
                 srcs = srcs + [":Cargo.toml"],
                 outs = [name + "_out_dir_outputs.tar.gz"],
                 tools = [":" + name + "_build_script"],
-                cmd = "mkdir " + name + "_out_dir_outputs/; CARGO_MANIFEST_DIR=\"$$PWD/" + workspace_path[2:] + cargo_bzl.package.pkg_name + '-' + cargo_bzl.package.pkg_version + "\" TARGET='x86_64-unknown-linux-gnu' OUT_DIR=\'./" + name +  "_out_dir_outputs\' $(location :" + name + "_build_script" + "); tar -czf $@ -C" + name + "_out_dir_outputs/ .; tree")
+                cmd = "mkdir " + name + "_out_dir_outputs/;"
+                    + " CARGO_MANIFEST_DIR=\"$$PWD/" + workspace_path[2:] + cargo_bzl.package.pkg_name + '-' + cargo_bzl.package.pkg_version + "\""
+                    + " TARGET='x86_64-unknown-linux-gnu'"
+                    + " OUT_DIR=\'./" + name +  "_out_dir_outputs\'"
+                    + " $(location :" + name + "_build_script" + "); tar -czf $@ -C" + name + "_out_dir_outputs/ .; tree"
+            )
 
