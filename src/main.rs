@@ -31,6 +31,7 @@ use std::str;
 
 // A basic expr type for bzl files
 pub enum BExpr {
+  Bool(bool),
   Value(String),
   Array(Vec<BExpr>),
   Struct(Vec<(String, BExpr)>),
@@ -50,6 +51,8 @@ impl BExpr {
       .take(space_count)
       .collect::<String>();
     match self {
+      &BExpr::Bool(true) => "True".to_owned(),
+      &BExpr::Bool(false) => "False".to_owned(),
       &BExpr::Value(ref s) => format!("\"{}\"", s),
       &BExpr::Array(ref a) if a.len() == 0 => format!("[]"),
       &BExpr::Array(ref a) => format!("[\n{}{}]", a.iter()
@@ -123,6 +126,12 @@ impl ToBExpr for String {
   }
 }
 
+impl ToBExpr for bool {
+  fn to_expr(&self) -> BExpr {
+    BExpr::Bool(*self)
+  }
+}
+
 #[derive(Debug, Clone)]
 pub struct BazelPackage {
   pub id: PackageId,
@@ -135,6 +144,22 @@ pub struct BazelPackage {
   pub dev_dependencies: Vec<BazelDependency>,
   pub is_root_dependency: bool,
   pub targets: Vec<BazelTarget>,
+  pub bazel_config: BazelConfig,
+}
+
+#[derive(Debug, Clone)]
+pub struct BazelConfig {
+  pub use_build_rs: bool,
+  pub use_metadeps: bool
+}
+
+impl Default for BazelConfig {
+  fn default() -> BazelConfig {
+    BazelConfig {
+      use_build_rs: true,
+      use_metadeps: false,
+    }
+  }
 }
 
 impl ToBExpr for BazelPackage {
@@ -144,11 +169,21 @@ impl ToBExpr for BazelPackage {
         "pkg_name" => b_value!(self.id.name()),
         "pkg_version" => b_value!(self.id.version())
       },
+      "bazel_config" => self.bazel_config.to_expr(),
       "dependencies" => self.dependencies.to_expr(),
       "build_dependencies" => self.build_dependencies.to_expr(),
       "dev_dependencies" => self.dev_dependencies.to_expr(),
       "features" => self.features.to_expr(),
       "targets" => self.targets.to_expr()
+    }
+  }
+}
+
+impl ToBExpr for BazelConfig {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "use_build_rs" => self.use_build_rs.to_expr(),
+      "use_metadeps" => self.use_metadeps.to_expr()
     }
   }
 }
@@ -228,11 +263,16 @@ fn real_main(options: Options, config: &Config) -> CliResult {
                           /* frozen = */ false,
                           /* locked = */ false));
     let workspace_prefix = options.arg_buildprefix
-      .expect("build prefix must be specified (in the form //path/to/vendor/directory");
+
+      .expect("build prefix must be specified (in the form //path/to/vendor/directory)");
     let platform_triple = config.rustc()?.host.clone();
 
-    let mut spec_escape = None;
-    let (packages, resolve) = {
+    // TODO: use the fancy error chain stuff when I have time to grok it.
+    assert!(
+      workspace_prefix.ends_with("/vendor"),
+      "workspace_prefix should end with /vendor (currently a hard limitation)");
+
+    let (spec_escape, (packages, resolve)) = {
         let lockfile = Path::new("Cargo.lock");
         let manifest_path = lockfile.parent().unwrap().join("Cargo.toml");
         let manifest = env::current_dir().unwrap().join(&manifest_path);
@@ -240,10 +280,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         let specs = Packages::All.into_package_id_specs(&ws).chain_error(|| {
           human("failed to find specs? whats a spec?")
         })?;
-        // TODO:
-        spec_escape = Some(specs.clone());
-
-        ops::resolve_ws_precisely(
+        (specs.clone(), ops::resolve_ws_precisely(
                 &ws,
                 None,
                 &[],
@@ -251,11 +288,11 @@ fn real_main(options: Options, config: &Config) -> CliResult {
                 false,
                 &specs).chain_error(|| {
             human("failed to load pkg lockfile")
-        })?
+        })?)
     };
 
     // TODO: clean this up -- it was the fastest way I could think to do this.
-    let root_name = spec_escape.unwrap().iter().next().unwrap().name().to_owned();
+    let root_name = spec_escape.iter().next().unwrap().name().to_owned();
     let root_package_id = resolve.iter()
       .filter(|dep| dep.name() == root_name)
       .next()
@@ -295,6 +332,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
           build_dependencies: Vec::new(),
           dev_dependencies: Vec::new(),
           targets: Vec::new(),
+          bazel_config: BazelConfig::default(),
       })
       .collect::<Vec<_>>();
 
@@ -415,7 +453,7 @@ platform_triple: {platform_triple}
 platform_attrs:
 {platform_attrs:#?}
 
-DO NOT MODIFY! Instead, add a CargoOverride.bzl mixin.
+DO NOT MODIFY! Instead, update vendor/CargoOverrides.bzl.
 """
 description = {expr}
 "#,
@@ -433,44 +471,33 @@ description = {expr}
 
     let overwrite_existing_files = options.flag_overwrite.unwrap_or(false);
 
-    // Generate CargoOverride.bzl file if they don't already exist
-    for pkg in raze_packages.iter() {
-        let file_contents = format!(
+    // Generate CargoOverrides.bzl file if it doesn't already exist
+    let file_contents = format!(
 r#""""
-cargo-raze details override for {name}.
+cargo-raze vendor-wide override file
 
 Make your changes here. Bazel automatically integrates overrides from this
 file and will not overwrite it on a rerun of cargo-raze.
 
-Environment variables should be of the form
+Override entries should be of identical form to generated Cargo.bzl entries.
+Properties defined here will take priority over generated properties.
 
-("key", "value")
-
-Dependencies should be of the form
-
-struct(
-    name = "some-dependency",
-    path = "//some/depot/path",
-)
+Reruns of cargo-raze may change the versions of your dependencies. Fear not!
+cargo-raze will warn you if it detects an override for different version of a
+dependency, to prompt you to update the specified override version.
 """
-override = struct(
-  rustc_flags = [],
-  environment_variables = [],
-  dependencies = []
-)
-"#, name = pkg.full_name);
+overrides = []
+"#,);
 
-        let cargo_override_bzl_path = format!("{}CargoOverride.bzl", &pkg.path);
-        if !overwrite_existing_files && fs::metadata(&cargo_override_bzl_path).is_ok() {
-          // File exists, skip
-          continue
-        }
-        try!(File::create(&cargo_override_bzl_path)
-             .and_then(|mut f| f.write_all(file_contents.as_bytes()))
-             .chain_error(|| human(format!("failed to create {}", cargo_override_bzl_path))));
-        println!("Generated {} successfully", cargo_override_bzl_path);
+    let cargo_override_bzl_path = format!("./vendor/CargoOverrides.bzl");
+    if overwrite_existing_files || !fs::metadata(&cargo_override_bzl_path).is_ok() {
+      try!(File::create(&cargo_override_bzl_path)
+           .and_then(|mut f| f.write_all(file_contents.as_bytes()))
+           .chain_error(|| human(format!("failed to create {}", cargo_override_bzl_path))));
+      println!("Generated {} successfully", cargo_override_bzl_path);
+    } else {
+      println!("Skipping CargoOverrides.bzl, since it already exists.");
     }
-
     // Generate root BUILD file with aliases to root dependencies
     // TODO: Consider generating this via bazel and using a Packages.bzl @ root
     let aliases = raze_packages.iter()
@@ -490,11 +517,12 @@ cargo-raze direct Cargo.toml dependencies.
 This BUILD file provides aliases to explicit cargo dependencies and is
 the only way to access vendored dependencies.
 
-If a dependency is missing, add it as an explicit root dependency and rerun raze.
+If a dependency is missing, add it as an explicit root dependency in
+Cargo.toml and rerun raze.
 
 This file is overridden on runs of raze; do not add anything to it.
 
-If that is causing you pain, please drop a line in the cargo-raze repo.
+If that is causing you pain, please drop a line in acmcarther/cargo-raze.
 """
 package(default_visibility = ["//visibility:public"])
 {aliases}
@@ -511,20 +539,19 @@ r#"package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 
 load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
 load(":Cargo.bzl", "description")
-load(":CargoOverride.bzl", "override")
+load("{workspace_prefix}:CargoOverrides.bzl", "overrides")
 
 cargo_library(
     srcs = glob(["lib.rs", "src/**/*.rs"]),
     cargo_bzl = description,
-    cargo_override_bzl = override,
+    cargo_override_bzl = overrides,
     workspace_path = "{workspace_prefix}/"
 )
 "#, workspace_prefix = workspace_prefix);
     for pkg in raze_packages.iter() {
       let build_stub_path = format!("{}BUILD", &pkg.path);
       if !overwrite_existing_files && fs::metadata(&build_stub_path).is_ok() {
-        println!("Skipping existing file {}", build_stub_path);
-        // File exists, skip
+        println!("Skipping existing BUILD stub file {}", build_stub_path);
         continue
       }
       try!(File::create(&build_stub_path)

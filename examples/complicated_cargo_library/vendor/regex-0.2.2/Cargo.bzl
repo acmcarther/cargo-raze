@@ -24,29 +24,33 @@ platform_attrs:
     "unix"
 ]
 
-DO NOT MODIFY! Instead, add a CargoOverride.bzl mixin.
+DO NOT MODIFY! Instead, update vendor/CargoOverrides.bzl.
 """
 description = struct(
     package = struct(
         pkg_name = "regex",
         pkg_version = "0.2.2",
     ),
+    bazel_config = struct(
+        use_build_rs = True,
+        use_metadeps = False,
+    ),
     dependencies = [
-        struct(
-            name = "regex-syntax",
-            version = "0.4.1",
-        ),
         struct(
             name = "aho-corasick",
             version = "0.6.3",
+        ),
+        struct(
+            name = "memchr",
+            version = "1.0.1",
         ),
         struct(
             name = "utf8-ranges",
             version = "1.0.0",
         ),
         struct(
-            name = "memchr",
-            version = "1.0.1",
+            name = "regex-syntax",
+            version = "0.4.1",
         ),
         struct(
             name = "thread_local",

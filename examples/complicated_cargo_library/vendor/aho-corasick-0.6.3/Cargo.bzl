@@ -24,12 +24,16 @@ platform_attrs:
     "unix"
 ]
 
-DO NOT MODIFY! Instead, add a CargoOverride.bzl mixin.
+DO NOT MODIFY! Instead, update vendor/CargoOverrides.bzl.
 """
 description = struct(
     package = struct(
         pkg_name = "aho-corasick",
         pkg_version = "0.6.3",
+    ),
+    bazel_config = struct(
+        use_build_rs = True,
+        use_metadeps = False,
     ),
     dependencies = [
         struct(

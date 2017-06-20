@@ -5,6 +5,7 @@ authors = ["Alex McArther <acmcarther@gmail.com>"]
 
 [dependencies]
 regex = "0.2.2"
+x11 = "2.14.0"
 
 [lib]
 path = "fake_lib.rs"
