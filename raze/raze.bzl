@@ -53,12 +53,15 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
             if contains_build_script:
               out_dir_tar = ":" + name + "_build_script_executor"
 
-            # TODO: why did i do this?
-            #if name != target.name:
-              #native.alias(name = name, actual = ":" + target.name)
+            target_name = target.name.replace('-', '_')
+
+            # Refer to rust_library by desired (target) name, as users will expect it to `extern` by that name
+            # However, create an alias to the "default" name, so we can refer to it globally
+            if name != target_name:
+              native.alias(name = name, actual = ":" + target_name)
 
             rust_library(
-                name = name,
+                name = target_name,
                 srcs = full_srcs,
                 crate_root = target.path,
                 deps = deps,
