@@ -65,7 +65,7 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
                 rustc_flags = [
                     "--cap-lints allow",
                 ],
-                #out_dir_tar = out_dir_tar,
+                out_dir_tar = out_dir_tar,
                 crate_features = cargo_bzl.features
             )
 
