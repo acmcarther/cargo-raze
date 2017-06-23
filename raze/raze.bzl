@@ -90,7 +90,7 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
             # TODO: TARGET is hardcoded here: consider using info from Cargo.bzl
             native.genrule(
                 name = name + "_build_script_executor",
-                srcs = srcs + [":Cargo.toml"],
+                srcs = srcs + native.glob(["*"]),
                 outs = [name + "_out_dir_outputs.tar.gz"],
                 tools = [":" + name + "_build_script"],
                 cmd = "mkdir " + name + "_out_dir_outputs/;"
