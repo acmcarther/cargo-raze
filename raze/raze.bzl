@@ -96,7 +96,8 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
                 cmd = "mkdir " + name + "_out_dir_outputs/;"
                     + " CARGO_MANIFEST_DIR=\"$$PWD/" + workspace_path[2:] + cargo_bzl.package.pkg_name + '-' + cargo_bzl.package.pkg_version + "\""
                     + " TARGET='x86_64-unknown-linux-gnu'"
-                    + " OUT_DIR=\'./" + name +  "_out_dir_outputs\'"
-                    + " $(location :" + name + "_build_script" + "); tar -czf $@ -C" + name + "_out_dir_outputs/ .; tree"
+                    + " RUST_BACKTRACE=1"
+                    + " OUT_DIR=\'" + name +  "_out_dir_outputs\'"
+                    + " $(location :" + name + "_build_script" + "); tar -czf $@ -C " + name + "_out_dir_outputs/ .; tree"
             )
 
