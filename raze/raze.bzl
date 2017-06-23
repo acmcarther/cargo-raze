@@ -94,10 +94,12 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
                 outs = [name + "_out_dir_outputs.tar.gz"],
                 tools = [":" + name + "_build_script"],
                 cmd = "mkdir " + name + "_out_dir_outputs/;"
-                    + " CARGO_MANIFEST_DIR=\"$$PWD/" + workspace_path[2:] + cargo_bzl.package.pkg_name + '-' + cargo_bzl.package.pkg_version + "\""
-                    + " TARGET='x86_64-unknown-linux-gnu'"
-                    + " RUST_BACKTRACE=1"
-                    + " OUT_DIR=\'" + name +  "_out_dir_outputs\'"
-                    + " $(location :" + name + "_build_script" + "); tar -czf $@ -C " + name + "_out_dir_outputs/ .; tree"
+                    + " (export CARGO_MANIFEST_DIR=\"$$PWD/" + workspace_path[2:] + cargo_bzl.package.pkg_name + '-' + cargo_bzl.package.pkg_version + "\";"
+                    + " export TARGET='x86_64-unknown-linux-gnu';"
+                    + " export RUST_BACKTRACE=1;"
+                    + " export OUT_DIR=$$PWD/" + name +  "_out_dir_outputs;"
+                    + " export BINARY_PATH=$$PWD/$(location :" + name + "_build_script);"
+                    + " export OUT_TAR=$$PWD/$@;"
+                    + " cd $$(dirname $(location :Cargo.toml)) && $$(env $$BINARY_PATH) && tar -czf $$OUT_TAR -C $$OUT_DIR . && tree)"
             )
 
