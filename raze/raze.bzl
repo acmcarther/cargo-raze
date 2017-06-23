@@ -98,8 +98,8 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
                     + " export TARGET='x86_64-unknown-linux-gnu';"
                     + " export RUST_BACKTRACE=1;"
                     + " export OUT_DIR=$$PWD/" + name +  "_out_dir_outputs;"
-                    + " export BINARY_PATH=\"$$PWD/$(location :" + name + "_build_script);\""
+                    + " export BINARY_PATH=\"$$PWD/$(location :" + name + "_build_script)\";"
                     + " export OUT_TAR=$$PWD/$@;"
-                    + " cd $$(dirname $(location :Cargo.toml)) && $$(env $$BINARY_PATH) && tar -czf $$OUT_TAR -C $$OUT_DIR . && tree)"
+                    + " tree && cd $$(dirname $(location :Cargo.toml)) && $$(env $$BINARY_PATH) && tar -czf $$OUT_TAR -C $$OUT_DIR . && tree)"
             )
 
