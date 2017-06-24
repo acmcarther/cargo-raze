@@ -71,7 +71,6 @@ workspace = struct(
             ),
         ],
     ),
-    workspace_path = "//examples/complicated_cargo_library/vendor",
     packages = [
         struct(
             package = struct(
@@ -271,9 +270,9 @@ workspace = struct(
             build_dependencies = [],
             dev_dependencies = [],
             features = [
-                "use_std",
-                "libc",
                 "default",
+                "libc",
+                "use_std",
             ],
             targets = [
                 struct(
@@ -303,12 +302,12 @@ workspace = struct(
             ),
             dependencies = [
                 struct(
-                    name = "pkg-config",
-                    version = "0.3.9",
-                ),
-                struct(
                     name = "toml",
                     version = "0.2.1",
+                ),
+                struct(
+                    name = "pkg-config",
+                    version = "0.3.9",
                 ),
                 struct(
                     name = "error-chain",
@@ -376,14 +375,6 @@ workspace = struct(
             ),
             dependencies = [
                 struct(
-                    name = "aho-corasick",
-                    version = "0.6.3",
-                ),
-                struct(
-                    name = "utf8-ranges",
-                    version = "1.0.0",
-                ),
-                struct(
                     name = "memchr",
                     version = "1.0.1",
                 ),
@@ -394,6 +385,14 @@ workspace = struct(
                 struct(
                     name = "regex-syntax",
                     version = "0.4.1",
+                ),
+                struct(
+                    name = "utf8-ranges",
+                    version = "1.0.0",
+                ),
+                struct(
+                    name = "aho-corasick",
+                    version = "0.6.3",
                 ),
             ],
             build_dependencies = [],
