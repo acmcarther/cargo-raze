@@ -11,4 +11,11 @@ Reruns of cargo-raze may change the versions of your dependencies. Fear not!
 cargo-raze will warn you if it detects an override for different version of a
 dependency, to prompt you to update the specified override version.
 """
-overrides = []
+overrides = [
+    struct(
+        package = struct(
+            pkg_name = "x11",
+            pkg_version = "2.14.0",
+        ),
+    )
+]
