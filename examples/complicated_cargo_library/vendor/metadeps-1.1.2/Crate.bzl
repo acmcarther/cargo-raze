@@ -14,16 +14,16 @@ description = struct(
     ),
     dependencies = [
         struct(
+            name = "error-chain",
+            version = "0.10.0",
+        ),
+        struct(
             name = "toml",
             version = "0.2.1",
         ),
         struct(
             name = "pkg-config",
             version = "0.3.9",
-        ),
-        struct(
-            name = "error-chain",
-            version = "0.10.0",
         ),
     ],
     build_dependencies = [],

@@ -239,8 +239,8 @@ workspace = struct(
             build_dependencies = [],
             dev_dependencies = [],
             features = [
-                "default",
                 "use_std",
+                "default",
             ],
             targets = [
                 struct(
@@ -270,8 +270,8 @@ workspace = struct(
             build_dependencies = [],
             dev_dependencies = [],
             features = [
-                "default",
                 "libc",
+                "default",
                 "use_std",
             ],
             targets = [
@@ -302,16 +302,16 @@ workspace = struct(
             ),
             dependencies = [
                 struct(
+                    name = "error-chain",
+                    version = "0.10.0",
+                ),
+                struct(
                     name = "toml",
                     version = "0.2.1",
                 ),
                 struct(
                     name = "pkg-config",
                     version = "0.3.9",
-                ),
-                struct(
-                    name = "error-chain",
-                    version = "0.10.0",
                 ),
             ],
             build_dependencies = [],
@@ -375,20 +375,20 @@ workspace = struct(
             ),
             dependencies = [
                 struct(
-                    name = "memchr",
-                    version = "1.0.1",
-                ),
-                struct(
                     name = "thread_local",
                     version = "0.3.3",
                 ),
                 struct(
-                    name = "regex-syntax",
-                    version = "0.4.1",
-                ),
-                struct(
                     name = "utf8-ranges",
                     version = "1.0.0",
+                ),
+                struct(
+                    name = "memchr",
+                    version = "1.0.1",
+                ),
+                struct(
+                    name = "regex-syntax",
+                    version = "0.4.1",
                 ),
                 struct(
                     name = "aho-corasick",

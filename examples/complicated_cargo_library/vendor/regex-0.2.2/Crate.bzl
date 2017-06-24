@@ -14,20 +14,20 @@ description = struct(
     ),
     dependencies = [
         struct(
-            name = "memchr",
-            version = "1.0.1",
-        ),
-        struct(
             name = "thread_local",
             version = "0.3.3",
         ),
         struct(
-            name = "regex-syntax",
-            version = "0.4.1",
-        ),
-        struct(
             name = "utf8-ranges",
             version = "1.0.0",
+        ),
+        struct(
+            name = "memchr",
+            version = "1.0.1",
+        ),
+        struct(
+            name = "regex-syntax",
+            version = "0.4.1",
         ),
         struct(
             name = "aho-corasick",

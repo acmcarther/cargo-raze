@@ -16,8 +16,8 @@ description = struct(
     build_dependencies = [],
     dev_dependencies = [],
     features = [
-        "default",
         "use_std",
+        "default",
     ],
     targets = [
         struct(

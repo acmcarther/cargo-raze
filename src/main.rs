@@ -70,16 +70,16 @@ fn real_main(options: Options, config: &Config) -> CliResult {
                           &options.flag_color,
                           /* frozen = */ false,
                           /* locked = */ false));
-    let mut workspace_prefix = options.arg_buildprefix
-          .expect("build prefix must be specified (in the form //path/where/vendor/is)");
+    let workspace_prefix = options.arg_buildprefix
+          .expect("build prefix must be specified (in the for m //path/where/vendor/is)");
 
     // TODO: use the fancy error chain stuff when I have time to grok it.
     assert!(
       !workspace_prefix.ends_with("/vendor"),
       "workspace_prefix should not end with /vendor -- point one directory up");
-    if !workspace_prefix.ends_with('/') {
-      workspace_prefix = format!("{}/", workspace_prefix);
-    }
+    assert!(
+      !workspace_prefix.ends_with("/"),
+      "workspace_prefix should not end with /, drop the slash");
 
     let platform_triple = config.rustc()?.host.clone();
 
