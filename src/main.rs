@@ -1,6 +1,12 @@
 extern crate cargo;
 extern crate rustc_serialize;
 
+#[macro_use]
+mod files;
+mod bazel;
+
+use files::BExpr;
+use files::ToBExpr;
 use cargo::CliResult;
 use cargo::core::Dependency;
 use cargo::core::Package;
@@ -19,9 +25,6 @@ use cargo::util::human;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
-use std::iter;
-use std::hash::Hash;
-use std::cmp::Eq;
 use std::fs;
 use std::io::Write;
 use std::fs::File;
@@ -29,196 +32,6 @@ use std::path::Path;
 use std::str::FromStr;
 use std::str;
 
-// A basic expr type for bzl files
-pub enum BExpr {
-  Bool(bool),
-  Value(String),
-  Array(Vec<BExpr>),
-  Struct(Vec<(String, BExpr)>),
-}
-
-impl BExpr {
-  pub fn pretty_print(&self) -> String {
-    self.pretty_print_spaced(4 /* space_count */)
-  }
-
-  fn pretty_print_spaced(&self, space_count: usize) -> String {
-    assert!(space_count >= 4);
-    let less_spaces = iter::repeat(' ')
-      .take(if space_count > 0 { space_count - 4 } else { 0 })
-      .collect::<String>();
-    let spaces = iter::repeat(' ')
-      .take(space_count)
-      .collect::<String>();
-    match self {
-      &BExpr::Bool(true) => "True".to_owned(),
-      &BExpr::Bool(false) => "False".to_owned(),
-      &BExpr::Value(ref s) => format!("\"{}\"", s),
-      &BExpr::Array(ref a) if a.len() == 0 => format!("[]"),
-      &BExpr::Array(ref a) => format!("[\n{}{}]", a.iter()
-                              .map(|i| format!("{}{},\n", spaces, i.pretty_print_spaced(space_count + 4)))
-                              .collect::<String>(), less_spaces),
-      &BExpr::Struct(ref s) if s.len() == 0 => format!("struct()"),
-      &BExpr::Struct(ref s) => format!("struct(\n{}{})", s.iter()
-                              .map(|&(ref k, ref v)| format!("{}{} = {},\n", spaces, k, v.pretty_print_spaced(space_count + 4)))
-                              .collect::<String>(), less_spaces),
-    }
-  }
-}
-
-// Produces a hashmap-ish Struct BExpr
-macro_rules! b_struct {
-    ($($key:expr => $value:expr),*) => {
-        {
-            let mut contents: Vec<(String, BExpr)> = Vec::new();
-            $(
-              contents.push(($key.to_string(), $value));
-            )*
-            BExpr::Struct(contents)
-        }
-    };
-}
-
-// Produces an array-ish BExpr
-macro_rules! b_array {
-    ($($value:expr),*) => {
-        {
-            let mut contents: Vec<BExpr> = Vec::new();
-            $(
-              contents.push($value);
-            )*
-            BExpr::Array(contents)
-        }
-    };
-}
-
-// Produces a string-ish value BExpr
-macro_rules! b_value {
-    ($value:expr) => {
-      BExpr::Value($value.to_string())
-    };
-}
-
-trait ToBExpr {
-  fn to_expr(&self) -> BExpr;
-}
-
-impl <T> ToBExpr for Vec<T> where T: ToBExpr {
-  fn to_expr(&self) -> BExpr {
-    BExpr::Array(self.iter().map(|v| v.to_expr()).collect())
-  }
-}
-impl <T> ToBExpr for HashSet<T> where T: Eq + Hash + ToBExpr {
-  fn to_expr(&self) -> BExpr {
-    BExpr::Array(self.iter().map(|v| v.to_expr()).collect())
-  }
-}
-
-impl <T> ToBExpr for HashMap<String, T> where T: ToBExpr {
-  fn to_expr(&self) -> BExpr {
-    BExpr::Struct(self.iter().map(|(k, v)| (k.clone(), v.to_expr())).collect())
-  }
-}
-
-impl ToBExpr for String {
-  fn to_expr(&self) -> BExpr {
-    b_value!(self)
-  }
-}
-
-impl ToBExpr for bool {
-  fn to_expr(&self) -> BExpr {
-    BExpr::Bool(*self)
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct BazelPackage {
-  pub id: PackageId,
-  pub package: Package,
-  pub features: HashSet<String>,
-  pub full_name: String,
-  pub path: String,
-  pub dependencies: Vec<BazelDependency>,
-  pub build_dependencies: Vec<BazelDependency>,
-  pub dev_dependencies: Vec<BazelDependency>,
-  pub is_root_dependency: bool,
-  pub targets: Vec<BazelTarget>,
-  pub bazel_config: BazelConfig,
-}
-
-#[derive(Debug, Clone)]
-pub struct BazelConfig {
-  pub use_build_rs: bool,
-  pub use_metadeps: bool
-}
-
-impl Default for BazelConfig {
-  fn default() -> BazelConfig {
-    BazelConfig {
-      use_build_rs: true,
-      use_metadeps: false,
-    }
-  }
-}
-
-impl ToBExpr for BazelPackage {
-  fn to_expr(&self) -> BExpr {
-    b_struct! {
-      "package" => b_struct! {
-        "pkg_name" => b_value!(self.id.name()),
-        "pkg_version" => b_value!(self.id.version())
-      },
-      "bazel_config" => self.bazel_config.to_expr(),
-      "dependencies" => self.dependencies.to_expr(),
-      "build_dependencies" => self.build_dependencies.to_expr(),
-      "dev_dependencies" => self.dev_dependencies.to_expr(),
-      "features" => self.features.to_expr(),
-      "targets" => self.targets.to_expr()
-    }
-  }
-}
-
-impl ToBExpr for BazelConfig {
-  fn to_expr(&self) -> BExpr {
-    b_struct! {
-      "use_build_rs" => self.use_build_rs.to_expr(),
-      "use_metadeps" => self.use_metadeps.to_expr()
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct BazelDependency {
-  pub name: String,
-  pub version: String,
-}
-
-impl ToBExpr for BazelDependency {
-  fn to_expr(&self) -> BExpr {
-    b_struct! {
-      "name" => b_value!(self.name),
-      "version" => b_value!(self.version)
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct BazelTarget {
-  pub name: String,
-  pub kinds: Vec<String>,
-  pub path: String,
-}
-
-impl ToBExpr for BazelTarget {
-  fn to_expr(&self) -> BExpr {
-    b_struct! {
-      "name" => b_value!(self.name),
-      "kinds" => self.kinds.to_expr(),
-      "path" => b_value!(self.path)
-    }
-  }
-}
 
 #[derive(Debug, RustcDecodable)]
 struct Options {
@@ -318,7 +131,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
     };
 
     let mut raze_packages = package_ids.iter()
-      .map(|id| BazelPackage {
+      .map(|id| bazel::Package {
           id: id.clone(),
           package: packages.get(id).unwrap().clone(),
           full_name: format!("{}-{}", id.name(), id.version()),
@@ -332,7 +145,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
           build_dependencies: Vec::new(),
           dev_dependencies: Vec::new(),
           targets: Vec::new(),
-          bazel_config: BazelConfig::default(),
+          bazel_config: bazel::Config::default(),
       })
       .collect::<Vec<_>>();
 
@@ -345,7 +158,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
 
     // Determine targets
     for mut pkg in raze_packages.iter_mut() {
-        let &mut BazelPackage {
+        let &mut bazel::Package {
           ref full_name,
           ref package,
           ref mut targets, ..} = pkg;
@@ -364,7 +177,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
             let local_path = String::from_utf8(local_path_bytes)
               .expect("source string was corrupted while slicing");
 
-            targets.push(BazelTarget {
+            targets.push(bazel::Target {
               name: target.name().to_owned(),
               path: local_path,
               kinds: kind_to_kinds(target.kind()),
@@ -376,7 +189,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
 
     // Determine exact dependencies per package
     for mut pkg in raze_packages.iter_mut() {
-        let &mut BazelPackage {
+        let &mut bazel::Package {
           ref id,
           ref package,
           ref mut dependencies,
@@ -421,7 +234,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
                 continue
             }
             let planned_dependency = planned_dependencies_by_name.get(dependency_name).unwrap();
-            let bazel_dependency = BazelDependency {
+            let bazel_dependency = bazel::Dependency {
                 name: dependency_name.clone(),
                 version: planned_dependency.version().to_string(),
             };
@@ -440,127 +253,11 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         }
     }
 
-    let platform_attrs_pretty = platform_attrs.iter().map(cfg_pretty).collect::<Vec<_>>();
+    let workspace = bazel::Workspace::new(&raze_packages, &platform_triple, &platform_attrs, &workspace_prefix);
 
-    // Generate Cargo.bzl files
-    for pkg in raze_packages.iter() {
-        let file_contents = format!(
-r#""""
-cargo-raze generated details for {name}.
+    try!(files::generate_override_file(options.flag_overwrite.unwrap_or(false)));
+    try!(files::generate_workspace_file(&workspace));
 
-Generated for:
-platform_triple: {platform_triple}
-platform_attrs:
-{platform_attrs:#?}
-
-DO NOT MODIFY! Instead, update vendor/CargoOverrides.bzl.
-"""
-description = {expr}
-"#,
-            name = pkg.full_name,
-            platform_triple = platform_triple,
-            platform_attrs = platform_attrs_pretty,
-            expr = pkg.to_expr().pretty_print());
-
-        let cargo_bzl_path = format!("{}Cargo.bzl", &pkg.path);
-        try!(File::create(&cargo_bzl_path)
-             .and_then(|mut f| f.write_all(file_contents.as_bytes()))
-             .chain_error(|| human(format!("failed to create {}", cargo_bzl_path))));
-        println!("Generated {} successfully", cargo_bzl_path);
-    }
-
-    let overwrite_existing_files = options.flag_overwrite.unwrap_or(false);
-
-    // Generate CargoOverrides.bzl file if it doesn't already exist
-    let file_contents = format!(
-r#""""
-cargo-raze vendor-wide override file
-
-Make your changes here. Bazel automatically integrates overrides from this
-file and will not overwrite it on a rerun of cargo-raze.
-
-Override entries should be of identical form to generated Cargo.bzl entries.
-Properties defined here will take priority over generated properties.
-
-Reruns of cargo-raze may change the versions of your dependencies. Fear not!
-cargo-raze will warn you if it detects an override for different version of a
-dependency, to prompt you to update the specified override version.
-"""
-overrides = []
-"#,);
-
-    let cargo_override_bzl_path = format!("./vendor/CargoOverrides.bzl");
-    if overwrite_existing_files || !fs::metadata(&cargo_override_bzl_path).is_ok() {
-      try!(File::create(&cargo_override_bzl_path)
-           .and_then(|mut f| f.write_all(file_contents.as_bytes()))
-           .chain_error(|| human(format!("failed to create {}", cargo_override_bzl_path))));
-      println!("Generated {} successfully", cargo_override_bzl_path);
-    } else {
-      println!("Skipping CargoOverrides.bzl, since it already exists.");
-    }
-    // Generate root BUILD file with aliases to root dependencies
-    // TODO: Consider generating this via bazel and using a Packages.bzl @ root
-    let aliases = raze_packages.iter()
-        .filter(|pkg| pkg.is_root_dependency)
-        .map(|pkg| format!(
-r#"
-alias(
-    name = "{name}",
-    actual = "{workspace_prefix}/{full_name}:{sanitized_name}",
-)
-"#, name = pkg.id.name(), sanitized_name = pkg.id.name().replace("-", "_"), workspace_prefix = workspace_prefix, full_name = pkg.full_name))
-        .collect::<String>();
-    let file_contents = format!(
-r#""""
-cargo-raze direct Cargo.toml dependencies.
-
-This BUILD file provides aliases to explicit cargo dependencies and is
-the only way to access vendored dependencies.
-
-If a dependency is missing, add it as an explicit root dependency in
-Cargo.toml and rerun raze.
-
-This file is overridden on runs of raze; do not add anything to it.
-
-If that is causing you pain, please drop a line in acmcarther/cargo-raze.
-"""
-package(default_visibility = ["//visibility:public"])
-{aliases}
-"#, aliases = aliases);
-    let alias_file_path = "./vendor/BUILD";
-    try!(File::create(alias_file_path)
-         .and_then(|mut f| f.write_all(file_contents.as_bytes()))
-         .chain_error(|| human(format!("failed to create {}", alias_file_path))));
-    println!("Generated {} successfully", alias_file_path);
-
-    // Generate BUILD file if they don't already exist and the flag is set
-    let build_stub_contents = format!(
-r#"package(default_visibility = ["{workspace_prefix}:__subpackages__"])
-
-load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
-load(":Cargo.bzl", "description")
-load("{workspace_prefix}:CargoOverrides.bzl", "overrides")
-
-cargo_library(
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-    cargo_bzl = description,
-    cargo_override_bzl = overrides,
-    workspace_path = "{workspace_prefix}/"
-)
-"#, workspace_prefix = workspace_prefix);
-    for pkg in raze_packages.iter() {
-      let build_stub_path = format!("{}BUILD", &pkg.path);
-      if !overwrite_existing_files && fs::metadata(&build_stub_path).is_ok() {
-        println!("Skipping existing BUILD stub file {}", build_stub_path);
-        continue
-      }
-      try!(File::create(&build_stub_path)
-           .and_then(|mut f| f.write_all(build_stub_contents.as_bytes()))
-           .chain_error(|| human(format!("failed to create {}", build_stub_path))));
-      println!("Generated {} successfully", build_stub_path);
-    }
-
-    println!("All done!");
     Ok(())
 }
 
