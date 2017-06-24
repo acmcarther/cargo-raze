@@ -5,11 +5,8 @@ extern crate rustc_serialize;
 mod files;
 mod bazel;
 
-use files::BExpr;
-use files::ToBExpr;
 use cargo::CliResult;
 use cargo::core::Dependency;
-use cargo::core::Package;
 use cargo::core::PackageId;
 use cargo::core::TargetKind;
 use cargo::core::SourceId;
@@ -26,8 +23,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
-use std::io::Write;
-use std::fs::File;
 use std::path::Path;
 use std::str::FromStr;
 use std::str;
@@ -55,7 +50,7 @@ Options:
     --host HOST              Registry index to sync with
     -q, --quiet              No output printed to stdout
     --color WHEN             Coloring: auto, always, never
-    --overwrite              Overwrite any customizable files (BUILD, CargoOverride.bzl)
+    --overwrite              Overwrite CargoOverride.bzl
 "#;
 
 fn main() {
@@ -75,15 +70,18 @@ fn real_main(options: Options, config: &Config) -> CliResult {
                           &options.flag_color,
                           /* frozen = */ false,
                           /* locked = */ false));
-    let workspace_prefix = options.arg_buildprefix
-
-      .expect("build prefix must be specified (in the form //path/to/vendor/directory)");
-    let platform_triple = config.rustc()?.host.clone();
+    let mut workspace_prefix = options.arg_buildprefix
+          .expect("build prefix must be specified (in the form //path/where/vendor/is)");
 
     // TODO: use the fancy error chain stuff when I have time to grok it.
     assert!(
-      workspace_prefix.ends_with("/vendor"),
-      "workspace_prefix should end with /vendor (currently a hard limitation)");
+      !workspace_prefix.ends_with("/vendor"),
+      "workspace_prefix should not end with /vendor -- point one directory up");
+    if !workspace_prefix.ends_with('/') {
+      workspace_prefix = format!("{}/", workspace_prefix);
+    }
+
+    let platform_triple = config.rustc()?.host.clone();
 
     let (spec_escape, (packages, resolve)) = {
         let lockfile = Path::new("Cargo.lock");
@@ -253,10 +251,16 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         }
     }
 
-    let workspace = bazel::Workspace::new(&raze_packages, &platform_triple, &platform_attrs, &workspace_prefix);
+    for package in &raze_packages {
+      try!(files::generate_crate_bzl_file(&package));
+      try!(files::generate_crate_build_file(&package, &workspace_prefix));
+    }
 
-    try!(files::generate_override_file(options.flag_overwrite.unwrap_or(false)));
-    try!(files::generate_workspace_file(&workspace));
+    let workspace = bazel::Workspace::new(&raze_packages, &platform_triple, &platform_attrs);
+
+    try!(files::generate_vendor_build_file(&raze_packages, &workspace_prefix));
+    try!(files::generate_workspace_bzl_file(&workspace));
+    try!(files::generate_override_bzl_file(options.flag_overwrite.unwrap_or(false)));
 
     Ok(())
 }
@@ -287,13 +291,6 @@ unix"#;
       .map(Cfg::from_str)
       .map(|cfg| cfg.expect("hardcoded values should be parsable"))
       .collect()
-}
-
-fn cfg_pretty(cfg: &Cfg) -> String {
-    match cfg {
-        &Cfg::Name(ref s) => s.clone(),
-        &Cfg::KeyPair(ref k, ref v) => format!("{}: {}", k, v)
-    }
 }
 
 // TODO(acmcarther): Remove this shim from cargo when Cargo is upgraded
