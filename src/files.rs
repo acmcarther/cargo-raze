@@ -213,6 +213,19 @@ package(default_visibility = ["//visibility:public"])
     Ok(())
 }
 
+pub fn generate_outer_build_file(should_overwrite: bool) -> Result<(), Box<CargoError>> {
+    let outer_build_file_path = format!("./BUILD");
+    if should_overwrite || !fs::metadata(&outer_build_file_path).is_ok() {
+      try!(File::create(&outer_build_file_path)
+           .chain_error(|| human(format!("failed to create {}", outer_build_file_path))));
+      println!("Generated {} successfully", outer_build_file_path);
+    } else {
+      println!("Skipping BUILD, since it already exists.");
+    }
+
+    Ok(())
+}
+
 pub fn generate_override_bzl_file(should_overwrite: bool) -> Result<(), Box<CargoError>> {
     let file_contents = format!(
 r#""""

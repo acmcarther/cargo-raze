@@ -261,6 +261,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
     try!(files::generate_vendor_build_file(&raze_packages, &workspace_prefix));
     try!(files::generate_workspace_bzl_file(&workspace));
     try!(files::generate_override_bzl_file(options.flag_overwrite.unwrap_or(false)));
+    try!(files::generate_outer_build_file(options.flag_overwrite.unwrap_or(false)));
 
     Ok(())
 }
