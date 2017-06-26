@@ -2,7 +2,13 @@
 
 A cargo subcommand to generate platform-specific BUILD files.
 
-Also, a bazel ruleset for using the outputs of that cargo subcommand.
+Also, a bazel ruleset for using the outputs of that cargo subcommand.  
+
+## WARNING!!!
+
+This is still under heavy development. It has few tests and is very unstable. Please do not use it in a production environment! It relies on some custom changes to the [rules_rust](https://github.com/bazel/rules_rust) library to support build scripts and duplicate crate definitions. 
+
+If you'd like to use it anyway, you are definitely welcome to. Please direct any questions to acmcarther@: your input would be very helpful to guide development
 
 ## Problem
 
