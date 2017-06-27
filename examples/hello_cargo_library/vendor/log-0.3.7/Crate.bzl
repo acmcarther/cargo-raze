@@ -1,12 +1,12 @@
 """
-cargo-raze generated details for winapi-build-0.1.1.
+cargo-raze generated details for log-0.3.7.
 
 DO NOT MODIFY! Instead, update CargoOverrides.bzl.
 """
 description = struct(
     package = struct(
-        pkg_name = "winapi-build",
-        pkg_version = "0.1.1",
+        pkg_name = "log",
+        pkg_version = "0.3.7",
     ),
     bazel_config = struct(
         use_build_rs = True,
@@ -15,10 +15,20 @@ description = struct(
     dependencies = [],
     build_dependencies = [],
     dev_dependencies = [],
-    features = [],
+    features = [
+        "default",
+        "use_std",
+    ],
     targets = [
         struct(
-            name = "build",
+            name = "filters",
+            kinds = [
+                "test",
+            ],
+            path = "tests/filters.rs",
+        ),
+        struct(
+            name = "log",
             kinds = [
                 "lib",
             ],

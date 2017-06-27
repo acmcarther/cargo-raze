@@ -28,18 +28,18 @@ description = struct(
     features = [],
     targets = [
         struct(
-            name = "kernel32",
-            kinds = [
-                "lib",
-            ],
-            path = "src/lib.rs",
-        ),
-        struct(
             name = "build-script-build",
             kinds = [
                 "custom-build",
             ],
             path = "build.rs",
+        ),
+        struct(
+            name = "kernel32",
+            kinds = [
+                "lib",
+            ],
+            path = "src/lib.rs",
         ),
     ],
 )

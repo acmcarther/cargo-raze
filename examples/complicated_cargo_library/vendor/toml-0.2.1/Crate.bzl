@@ -18,6 +18,20 @@ description = struct(
     features = [],
     targets = [
         struct(
+            name = "formatting",
+            kinds = [
+                "test",
+            ],
+            path = "tests/formatting.rs",
+        ),
+        struct(
+            name = "invalid",
+            kinds = [
+                "test",
+            ],
+            path = "tests/invalid.rs",
+        ),
+        struct(
             name = "toml",
             kinds = [
                 "lib",
@@ -30,20 +44,6 @@ description = struct(
                 "example",
             ],
             path = "examples/toml2json.rs",
-        ),
-        struct(
-            name = "invalid",
-            kinds = [
-                "test",
-            ],
-            path = "tests/invalid.rs",
-        ),
-        struct(
-            name = "formatting",
-            kinds = [
-                "test",
-            ],
-            path = "tests/formatting.rs",
         ),
         struct(
             name = "valid",

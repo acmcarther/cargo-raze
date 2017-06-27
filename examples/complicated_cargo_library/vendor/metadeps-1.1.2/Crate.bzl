@@ -1,12 +1,12 @@
 """
-cargo-raze generated details for kernel32-sys-0.2.2.
+cargo-raze generated details for metadeps-1.1.2.
 
 DO NOT MODIFY! Instead, update CargoOverrides.bzl.
 """
 description = struct(
     package = struct(
-        pkg_name = "kernel32-sys",
-        pkg_version = "0.2.2",
+        pkg_name = "metadeps",
+        pkg_version = "1.1.2",
     ),
     bazel_config = struct(
         use_build_rs = True,
@@ -14,32 +14,35 @@ description = struct(
     ),
     dependencies = [
         struct(
-            name = "winapi",
-            version = "0.2.8",
+            name = "error-chain",
+            version = "0.10.0",
         ),
-    ],
-    build_dependencies = [
         struct(
-            name = "winapi-build",
-            version = "0.1.1",
+            name = "pkg-config",
+            version = "0.3.9",
+        ),
+        struct(
+            name = "toml",
+            version = "0.2.1",
         ),
     ],
+    build_dependencies = [],
     dev_dependencies = [],
     features = [],
     targets = [
         struct(
-            name = "kernel32",
+            name = "metadeps",
             kinds = [
                 "lib",
             ],
             path = "src/lib.rs",
         ),
         struct(
-            name = "build-script-build",
+            name = "test",
             kinds = [
-                "custom-build",
+                "test",
             ],
-            path = "build.rs",
+            path = "tests/test.rs",
         ),
     ],
 )

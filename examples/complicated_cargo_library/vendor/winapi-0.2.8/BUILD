@@ -1,12 +1,19 @@
-package(default_visibility = ["//examples/complicated_cargo_library/vendor:__subpackages__"])
+"""
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+package(default_visibility = ["//examples/complicated_cargo_library:__subpackages__"])
 
 load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
-load(":Cargo.bzl", "description")
-load("//examples/complicated_cargo_library/vendor:CargoOverrides.bzl", "overrides")
+load(":Crate.bzl", "description")
+load("//examples/complicated_cargo_library:Cargo.bzl", "workspace")
+load("//examples/complicated_cargo_library:CargoOverrides.bzl", "override_cfg")
 
 cargo_library(
     srcs = glob(["lib.rs", "src/**/*.rs"]),
-    cargo_bzl = description,
-    cargo_override_bzl = overrides,
-    workspace_path = "//examples/complicated_cargo_library/vendor/"
+    crate_bzl = description,
+    cargo_override_bzl = override_cfg,
+    platform = workspace.platform,
+    workspace_path = "//examples/complicated_cargo_library/"
 )

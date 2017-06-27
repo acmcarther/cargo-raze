@@ -1,12 +1,12 @@
 """
-cargo-raze generated details for thread_local-0.3.3.
+cargo-raze generated details for memchr-1.0.1.
 
 DO NOT MODIFY! Instead, update CargoOverrides.bzl.
 """
 description = struct(
     package = struct(
-        pkg_name = "thread_local",
-        pkg_version = "0.3.3",
+        pkg_name = "memchr",
+        pkg_version = "1.0.1",
     ),
     bazel_config = struct(
         use_build_rs = True,
@@ -14,20 +14,27 @@ description = struct(
     ),
     dependencies = [
         struct(
-            name = "unreachable",
-            version = "0.1.1",
-        ),
-        struct(
-            name = "thread-id",
-            version = "3.1.0",
+            name = "libc",
+            version = "0.2.24",
         ),
     ],
     build_dependencies = [],
     dev_dependencies = [],
-    features = [],
+    features = [
+        "default",
+        "libc",
+        "use_std",
+    ],
     targets = [
         struct(
-            name = "thread_local",
+            name = "bench",
+            kinds = [
+                "bench",
+            ],
+            path = "benches/bench.rs",
+        ),
+        struct(
+            name = "memchr",
             kinds = [
                 "lib",
             ],

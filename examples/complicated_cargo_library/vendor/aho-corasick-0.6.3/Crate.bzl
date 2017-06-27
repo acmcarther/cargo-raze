@@ -23,13 +23,6 @@ description = struct(
     features = [],
     targets = [
         struct(
-            name = "aho_corasick",
-            kinds = [
-                "lib",
-            ],
-            path = "src/lib.rs",
-        ),
-        struct(
             name = "aho-corasick-dot",
             kinds = [
                 "bin",
@@ -37,11 +30,11 @@ description = struct(
             path = "src/main.rs",
         ),
         struct(
-            name = "dict-search",
+            name = "aho_corasick",
             kinds = [
-                "example",
+                "lib",
             ],
-            path = "examples/dict-search.rs",
+            path = "src/lib.rs",
         ),
         struct(
             name = "bench",
@@ -49,6 +42,13 @@ description = struct(
                 "bench",
             ],
             path = "benches/bench.rs",
+        ),
+        struct(
+            name = "dict-search",
+            kinds = [
+                "example",
+            ],
+            path = "examples/dict-search.rs",
         ),
     ],
 )

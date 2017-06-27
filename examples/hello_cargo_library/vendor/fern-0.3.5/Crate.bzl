@@ -1,12 +1,12 @@
 """
-cargo-raze generated details for kernel32-sys-0.2.2.
+cargo-raze generated details for fern-0.3.5.
 
 DO NOT MODIFY! Instead, update CargoOverrides.bzl.
 """
 description = struct(
     package = struct(
-        pkg_name = "kernel32-sys",
-        pkg_version = "0.2.2",
+        pkg_name = "fern",
+        pkg_version = "0.3.5",
     ),
     bazel_config = struct(
         use_build_rs = True,
@@ -14,32 +14,34 @@ description = struct(
     ),
     dependencies = [
         struct(
-            name = "winapi",
-            version = "0.2.8",
+            name = "log",
+            version = "0.3.7",
         ),
     ],
-    build_dependencies = [
-        struct(
-            name = "winapi-build",
-            version = "0.1.1",
-        ),
-    ],
+    build_dependencies = [],
     dev_dependencies = [],
     features = [],
     targets = [
         struct(
-            name = "kernel32",
+            name = "doc_test_copy",
+            kinds = [
+                "test",
+            ],
+            path = "tests/doc_test_copy.rs",
+        ),
+        struct(
+            name = "fern",
             kinds = [
                 "lib",
             ],
             path = "src/lib.rs",
         ),
         struct(
-            name = "build-script-build",
+            name = "lib",
             kinds = [
-                "custom-build",
+                "test",
             ],
-            path = "build.rs",
+            path = "tests/lib.rs",
         ),
     ],
 )

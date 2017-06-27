@@ -28,13 +28,6 @@ description = struct(
     features = [],
     targets = [
         struct(
-            name = "x11",
-            kinds = [
-                "lib",
-            ],
-            path = "src/lib.rs",
-        ),
-        struct(
             name = "build-script-build",
             kinds = [
                 "custom-build",
@@ -49,18 +42,25 @@ description = struct(
             path = "examples/hello-world.rs",
         ),
         struct(
-            name = "xrecord",
-            kinds = [
-                "example",
-            ],
-            path = "examples/xrecord.rs",
-        ),
-        struct(
             name = "input",
             kinds = [
                 "example",
             ],
             path = "examples/input.rs",
+        ),
+        struct(
+            name = "x11",
+            kinds = [
+                "lib",
+            ],
+            path = "src/lib.rs",
+        ),
+        struct(
+            name = "xrecord",
+            kinds = [
+                "example",
+            ],
+            path = "examples/xrecord.rs",
         ),
     ],
 )

@@ -1,7 +1,7 @@
 load("@io_bazel_rules_rust//rust:rust.bzl", "rust_library", "rust_binary")
 
-def _contains_build_script(cargo_bzl):
-    for target in cargo_bzl.targets:
+def _contains_build_script(crate_bzl):
+    for target in crate_bzl.targets:
         for kind in target.kinds:
           if kind == 'custom-build':
                 return True
@@ -12,20 +12,21 @@ def _extract_dependency_paths(dependencies, workspace_path):
     deps = []
     for dependency in dependencies:
         dependency_name_sanitized = dependency.name.replace('-', '_')
-        deps.append(workspace_path + dependency.name + '-' + dependency.version + ":" + dependency_name_sanitized)
+        deps.append(workspace_path + "vendor/" + dependency.name + '-' + dependency.version + ":" + dependency_name_sanitized)
     return deps
 
-def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/"):
+def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path="//"):
 
-    package = cargo_bzl.package
+    name = crate_bzl.package.pkg_name.replace('-', '_')
+    package = crate_bzl.package
 
     # Gather list of nearly matching and exactly matching overrides
     this_override = None
     close_overrides = []
-    for override in cargo_override_bzl:
-      if package.pkg_name != override.package.pkg_name:
+    for override in cargo_override_bzl.global_settings.dependency_replacements:
+      if package.pkg_name != override.pkg_name:
         continue
-      if package.pkg_version == override.package.pkg_version:
+      if package.pkg_version == override.pkg_version:
         if not package:
           fail("Package was already set once!")
         this_override = override
@@ -33,21 +34,25 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
         close_overrides.append(override)
 
     if close_overrides and not this_override:
-      close_override_versions = [override.package.pkg_version for override in close_overrides]
+      close_override_versions = [override.pkg_version for override in close_overrides]
       print(("Did not find an exact override match for {}-{}, but found versions {}."
             + " Consider reviewing your CargoOverrides.bzl if you recently ran cargo-raze.")
             .format(package.pkg_name, package.pkg_version, close_override_versions))
 
     if this_override:
-      print("Override was present, but overrides are currently unsupported")
+      print("Override was present, using it!")
+      native.alias(
+          name = name,
+          actual = this_override.target
+      )
+      return
 
-    name = cargo_bzl.package.pkg_name.replace('-', '_')
 
-    contains_build_script = _contains_build_script(cargo_bzl)
+    contains_build_script = _contains_build_script(crate_bzl)
 
-    for target in cargo_bzl.targets:
+    for target in crate_bzl.targets:
         if "lib" in target.kinds:
-            deps = _extract_dependency_paths(cargo_bzl.dependencies, workspace_path)
+            deps = _extract_dependency_paths(crate_bzl.dependencies, workspace_path)
             full_srcs = srcs
             out_dir_tar = None
             if contains_build_script:
@@ -69,13 +74,13 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
                     "--cap-lints allow",
                 ],
                 out_dir_tar = out_dir_tar,
-                crate_features = cargo_bzl.features
+                crate_features = crate_bzl.features
             )
 
         if "custom-build" in target.kinds:
             # TODO: Many build scripts depend on cargo-supplied environment variables
             # Unsure how to handle this.
-            deps = _extract_dependency_paths(cargo_bzl.dependencies, workspace_path) + _extract_dependency_paths(cargo_bzl.build_dependencies, workspace_path)
+            deps = _extract_dependency_paths(crate_bzl.dependencies, workspace_path) + _extract_dependency_paths(crate_bzl.build_dependencies, workspace_path)
             rust_binary(
                 name = name + "_build_script",
                 srcs = srcs,
@@ -84,18 +89,17 @@ def cargo_library(srcs, cargo_bzl, cargo_override_bzl, workspace_path="//vendor/
                 rustc_flags = [
                     "--cap-lints allow",
                 ],
-                crate_features = cargo_bzl.features
+                crate_features = crate_bzl.features
             )
 
-            # TODO: TARGET is hardcoded here: consider using info from Cargo.bzl
             native.genrule(
                 name = name + "_build_script_executor",
                 srcs = srcs + native.glob(["*"]),
                 outs = [name + "_out_dir_outputs.tar.gz"],
                 tools = [":" + name + "_build_script"],
                 cmd = "mkdir " + name + "_out_dir_outputs/;"
-                    + " (export CARGO_MANIFEST_DIR=\"$$PWD/" + workspace_path[2:] + cargo_bzl.package.pkg_name + '-' + cargo_bzl.package.pkg_version + "\";"
-                    + " export TARGET='x86_64-unknown-linux-gnu';"
+                    + " (export CARGO_MANIFEST_DIR=\"$$PWD/" + workspace_path[2:] + "vendor/" + crate_bzl.package.pkg_name + '-' + crate_bzl.package.pkg_version + "\";"
+                    + " export TARGET='{}';".format(platform.triple)
                     + " export RUST_BACKTRACE=1;"
                     + " export OUT_DIR=$$PWD/" + name +  "_out_dir_outputs;"
                     + " export BINARY_PATH=\"$$PWD/$(location :" + name + "_build_script)\";"
