@@ -18,18 +18,18 @@ description = struct(
     features = [],
     targets = [
         struct(
-            name = "utf8-ranges",
-            kinds = [
-                "lib",
-            ],
-            path = "src/lib.rs",
-        ),
-        struct(
             name = "bench",
             kinds = [
                 "bench",
             ],
             path = "benches/bench.rs",
+        ),
+        struct(
+            name = "utf8-ranges",
+            kinds = [
+                "lib",
+            ],
+            path = "src/lib.rs",
         ),
     ],
 )

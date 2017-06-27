@@ -92,6 +92,13 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
+                    name = "doc_test_copy",
+                    kinds = [
+                        "test",
+                    ],
+                    path = "tests/doc_test_copy.rs",
+                ),
+                struct(
                     name = "fern",
                     kinds = [
                         "lib",
@@ -104,13 +111,6 @@ workspace = struct(
                         "test",
                     ],
                     path = "tests/lib.rs",
-                ),
-                struct(
-                    name = "doc_test_copy",
-                    kinds = [
-                        "test",
-                    ],
-                    path = "tests/doc_test_copy.rs",
                 ),
             ],
         ),
@@ -127,23 +127,23 @@ workspace = struct(
             build_dependencies = [],
             dev_dependencies = [],
             features = [
-                "use_std",
                 "default",
+                "use_std",
             ],
             targets = [
-                struct(
-                    name = "log",
-                    kinds = [
-                        "lib",
-                    ],
-                    path = "src/lib.rs",
-                ),
                 struct(
                     name = "filters",
                     kinds = [
                         "test",
                     ],
                     path = "tests/filters.rs",
+                ),
+                struct(
+                    name = "log",
+                    kinds = [
+                        "lib",
+                    ],
+                    path = "src/lib.rs",
                 ),
             ],
         ),

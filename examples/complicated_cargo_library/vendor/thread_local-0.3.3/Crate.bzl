@@ -14,12 +14,12 @@ description = struct(
     ),
     dependencies = [
         struct(
-            name = "unreachable",
-            version = "0.1.1",
-        ),
-        struct(
             name = "thread-id",
             version = "3.1.0",
+        ),
+        struct(
+            name = "unreachable",
+            version = "0.1.1",
         ),
     ],
     build_dependencies = [],

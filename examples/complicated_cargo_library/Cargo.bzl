@@ -92,13 +92,6 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
-                    name = "aho_corasick",
-                    kinds = [
-                        "lib",
-                    ],
-                    path = "src/lib.rs",
-                ),
-                struct(
                     name = "aho-corasick-dot",
                     kinds = [
                         "bin",
@@ -106,11 +99,11 @@ workspace = struct(
                     path = "src/main.rs",
                 ),
                 struct(
-                    name = "dict-search",
+                    name = "aho_corasick",
                     kinds = [
-                        "example",
+                        "lib",
                     ],
-                    path = "examples/dict-search.rs",
+                    path = "src/lib.rs",
                 ),
                 struct(
                     name = "bench",
@@ -118,6 +111,13 @@ workspace = struct(
                         "bench",
                     ],
                     path = "benches/bench.rs",
+                ),
+                struct(
+                    name = "dict-search",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/dict-search.rs",
                 ),
             ],
         ),
@@ -136,11 +136,11 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
-                    name = "error-chain",
+                    name = "all",
                     kinds = [
-                        "lib",
+                        "example",
                     ],
-                    path = "src/lib.rs",
+                    path = "examples/all.rs",
                 ),
                 struct(
                     name = "doc",
@@ -150,18 +150,18 @@ workspace = struct(
                     path = "examples/doc.rs",
                 ),
                 struct(
-                    name = "size",
+                    name = "error-chain",
                     kinds = [
-                        "example",
+                        "lib",
                     ],
-                    path = "examples/size.rs",
+                    path = "src/lib.rs",
                 ),
                 struct(
-                    name = "all",
+                    name = "quick_main",
                     kinds = [
-                        "example",
+                        "test",
                     ],
-                    path = "examples/all.rs",
+                    path = "tests/quick_main.rs",
                 ),
                 struct(
                     name = "quickstart",
@@ -171,18 +171,18 @@ workspace = struct(
                     path = "examples/quickstart.rs",
                 ),
                 struct(
+                    name = "size",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/size.rs",
+                ),
+                struct(
                     name = "tests",
                     kinds = [
                         "test",
                     ],
                     path = "tests/tests.rs",
-                ),
-                struct(
-                    name = "quick_main",
-                    kinds = [
-                        "test",
-                    ],
-                    path = "tests/quick_main.rs",
                 ),
             ],
         ),
@@ -211,18 +211,18 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
-                    name = "kernel32",
-                    kinds = [
-                        "lib",
-                    ],
-                    path = "src/lib.rs",
-                ),
-                struct(
                     name = "build-script-build",
                     kinds = [
                         "custom-build",
                     ],
                     path = "build.rs",
+                ),
+                struct(
+                    name = "kernel32",
+                    kinds = [
+                        "lib",
+                    ],
+                    path = "src/lib.rs",
                 ),
             ],
         ),
@@ -239,8 +239,8 @@ workspace = struct(
             build_dependencies = [],
             dev_dependencies = [],
             features = [
-                "use_std",
                 "default",
+                "use_std",
             ],
             targets = [
                 struct(
@@ -270,24 +270,24 @@ workspace = struct(
             build_dependencies = [],
             dev_dependencies = [],
             features = [
-                "libc",
                 "default",
+                "libc",
                 "use_std",
             ],
             targets = [
-                struct(
-                    name = "memchr",
-                    kinds = [
-                        "lib",
-                    ],
-                    path = "src/lib.rs",
-                ),
                 struct(
                     name = "bench",
                     kinds = [
                         "bench",
                     ],
                     path = "benches/bench.rs",
+                ),
+                struct(
+                    name = "memchr",
+                    kinds = [
+                        "lib",
+                    ],
+                    path = "src/lib.rs",
                 ),
             ],
         ),
@@ -306,12 +306,12 @@ workspace = struct(
                     version = "0.10.0",
                 ),
                 struct(
-                    name = "toml",
-                    version = "0.2.1",
-                ),
-                struct(
                     name = "pkg-config",
                     version = "0.3.9",
+                ),
+                struct(
+                    name = "toml",
+                    version = "0.2.1",
                 ),
             ],
             build_dependencies = [],
@@ -375,12 +375,8 @@ workspace = struct(
             ),
             dependencies = [
                 struct(
-                    name = "thread_local",
-                    version = "0.3.3",
-                ),
-                struct(
-                    name = "utf8-ranges",
-                    version = "1.0.0",
+                    name = "aho-corasick",
+                    version = "0.6.3",
                 ),
                 struct(
                     name = "memchr",
@@ -391,8 +387,12 @@ workspace = struct(
                     version = "0.4.1",
                 ),
                 struct(
-                    name = "aho-corasick",
-                    version = "0.6.3",
+                    name = "thread_local",
+                    version = "0.3.3",
+                ),
+                struct(
+                    name = "utf8-ranges",
+                    version = "1.0.0",
                 ),
             ],
             build_dependencies = [],
@@ -400,46 +400,25 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
-                    name = "regex",
+                    name = "backtrack",
                     kinds = [
-                        "lib",
+                        "test",
                     ],
-                    path = "src/lib.rs",
+                    path = "tests/test_backtrack.rs",
                 ),
                 struct(
-                    name = "shootout-regex-redux-1",
+                    name = "backtrack-bytes",
                     kinds = [
-                        "example",
+                        "test",
                     ],
-                    path = "examples/shootout-regex-redux-1.rs",
+                    path = "tests/test_backtrack_bytes.rs",
                 ),
                 struct(
-                    name = "shootout-regex-dna-single",
+                    name = "backtrack-utf8bytes",
                     kinds = [
-                        "example",
+                        "test",
                     ],
-                    path = "examples/shootout-regex-dna-single.rs",
-                ),
-                struct(
-                    name = "shootout-regex-dna-cheat",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/shootout-regex-dna-cheat.rs",
-                ),
-                struct(
-                    name = "shootout-regex-redux",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/shootout-regex-redux.rs",
-                ),
-                struct(
-                    name = "shootout-regex-redux-chunked",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/shootout-regex-redux-chunked.rs",
+                    path = "tests/test_backtrack_utf8bytes.rs",
                 ),
                 struct(
                     name = "bug347",
@@ -447,34 +426,6 @@ workspace = struct(
                         "example",
                     ],
                     path = "examples/bug347.rs",
-                ),
-                struct(
-                    name = "shootout-regex-dna-bytes",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/shootout-regex-dna-bytes.rs",
-                ),
-                struct(
-                    name = "shootout-regex-dna-single-cheat",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/shootout-regex-dna-single-cheat.rs",
-                ),
-                struct(
-                    name = "shootout-regex-dna-replace",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/shootout-regex-dna-replace.rs",
-                ),
-                struct(
-                    name = "shootout-regex-dna",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/shootout-regex-dna.rs",
                 ),
                 struct(
                     name = "default",
@@ -498,13 +449,6 @@ workspace = struct(
                     path = "tests/test_nfa.rs",
                 ),
                 struct(
-                    name = "nfa-utf8bytes",
-                    kinds = [
-                        "test",
-                    ],
-                    path = "tests/test_nfa_utf8bytes.rs",
-                ),
-                struct(
                     name = "nfa-bytes",
                     kinds = [
                         "test",
@@ -512,25 +456,81 @@ workspace = struct(
                     path = "tests/test_nfa_bytes.rs",
                 ),
                 struct(
-                    name = "backtrack",
+                    name = "nfa-utf8bytes",
                     kinds = [
                         "test",
                     ],
-                    path = "tests/test_backtrack.rs",
+                    path = "tests/test_nfa_utf8bytes.rs",
                 ),
                 struct(
-                    name = "backtrack-utf8bytes",
+                    name = "regex",
                     kinds = [
-                        "test",
+                        "lib",
                     ],
-                    path = "tests/test_backtrack_utf8bytes.rs",
+                    path = "src/lib.rs",
                 ),
                 struct(
-                    name = "backtrack-bytes",
+                    name = "shootout-regex-dna",
                     kinds = [
-                        "test",
+                        "example",
                     ],
-                    path = "tests/test_backtrack_bytes.rs",
+                    path = "examples/shootout-regex-dna.rs",
+                ),
+                struct(
+                    name = "shootout-regex-dna-bytes",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-dna-bytes.rs",
+                ),
+                struct(
+                    name = "shootout-regex-dna-cheat",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-dna-cheat.rs",
+                ),
+                struct(
+                    name = "shootout-regex-dna-replace",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-dna-replace.rs",
+                ),
+                struct(
+                    name = "shootout-regex-dna-single",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-dna-single.rs",
+                ),
+                struct(
+                    name = "shootout-regex-dna-single-cheat",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-dna-single-cheat.rs",
+                ),
+                struct(
+                    name = "shootout-regex-redux",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-redux.rs",
+                ),
+                struct(
+                    name = "shootout-regex-redux-1",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-redux-1.rs",
+                ),
+                struct(
+                    name = "shootout-regex-redux-chunked",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/shootout-regex-redux-chunked.rs",
                 ),
             ],
         ),
@@ -596,12 +596,12 @@ workspace = struct(
             ),
             dependencies = [
                 struct(
-                    name = "unreachable",
-                    version = "0.1.1",
-                ),
-                struct(
                     name = "thread-id",
                     version = "3.1.0",
+                ),
+                struct(
+                    name = "unreachable",
+                    version = "0.1.1",
                 ),
             ],
             build_dependencies = [],
@@ -632,6 +632,20 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
+                    name = "formatting",
+                    kinds = [
+                        "test",
+                    ],
+                    path = "tests/formatting.rs",
+                ),
+                struct(
+                    name = "invalid",
+                    kinds = [
+                        "test",
+                    ],
+                    path = "tests/invalid.rs",
+                ),
+                struct(
                     name = "toml",
                     kinds = [
                         "lib",
@@ -644,20 +658,6 @@ workspace = struct(
                         "example",
                     ],
                     path = "examples/toml2json.rs",
-                ),
-                struct(
-                    name = "invalid",
-                    kinds = [
-                        "test",
-                    ],
-                    path = "tests/invalid.rs",
-                ),
-                struct(
-                    name = "formatting",
-                    kinds = [
-                        "test",
-                    ],
-                    path = "tests/formatting.rs",
                 ),
                 struct(
                     name = "valid",
@@ -711,18 +711,18 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
-                    name = "utf8-ranges",
-                    kinds = [
-                        "lib",
-                    ],
-                    path = "src/lib.rs",
-                ),
-                struct(
                     name = "bench",
                     kinds = [
                         "bench",
                     ],
                     path = "benches/bench.rs",
+                ),
+                struct(
+                    name = "utf8-ranges",
+                    kinds = [
+                        "lib",
+                    ],
+                    path = "src/lib.rs",
                 ),
             ],
         ),
@@ -820,13 +820,6 @@ workspace = struct(
             features = [],
             targets = [
                 struct(
-                    name = "x11",
-                    kinds = [
-                        "lib",
-                    ],
-                    path = "src/lib.rs",
-                ),
-                struct(
                     name = "build-script-build",
                     kinds = [
                         "custom-build",
@@ -841,18 +834,25 @@ workspace = struct(
                     path = "examples/hello-world.rs",
                 ),
                 struct(
-                    name = "xrecord",
-                    kinds = [
-                        "example",
-                    ],
-                    path = "examples/xrecord.rs",
-                ),
-                struct(
                     name = "input",
                     kinds = [
                         "example",
                     ],
                     path = "examples/input.rs",
+                ),
+                struct(
+                    name = "x11",
+                    kinds = [
+                        "lib",
+                    ],
+                    path = "src/lib.rs",
+                ),
+                struct(
+                    name = "xrecord",
+                    kinds = [
+                        "example",
+                    ],
+                    path = "examples/xrecord.rs",
                 ),
             ],
         ),

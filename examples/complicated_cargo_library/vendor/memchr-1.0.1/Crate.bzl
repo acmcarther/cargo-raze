@@ -21,24 +21,24 @@ description = struct(
     build_dependencies = [],
     dev_dependencies = [],
     features = [
-        "libc",
         "default",
+        "libc",
         "use_std",
     ],
     targets = [
-        struct(
-            name = "memchr",
-            kinds = [
-                "lib",
-            ],
-            path = "src/lib.rs",
-        ),
         struct(
             name = "bench",
             kinds = [
                 "bench",
             ],
             path = "benches/bench.rs",
+        ),
+        struct(
+            name = "memchr",
+            kinds = [
+                "lib",
+            ],
+            path = "src/lib.rs",
         ),
     ],
 )

@@ -18,11 +18,11 @@ description = struct(
     features = [],
     targets = [
         struct(
-            name = "error-chain",
+            name = "all",
             kinds = [
-                "lib",
+                "example",
             ],
-            path = "src/lib.rs",
+            path = "examples/all.rs",
         ),
         struct(
             name = "doc",
@@ -32,18 +32,18 @@ description = struct(
             path = "examples/doc.rs",
         ),
         struct(
-            name = "size",
+            name = "error-chain",
             kinds = [
-                "example",
+                "lib",
             ],
-            path = "examples/size.rs",
+            path = "src/lib.rs",
         ),
         struct(
-            name = "all",
+            name = "quick_main",
             kinds = [
-                "example",
+                "test",
             ],
-            path = "examples/all.rs",
+            path = "tests/quick_main.rs",
         ),
         struct(
             name = "quickstart",
@@ -53,18 +53,18 @@ description = struct(
             path = "examples/quickstart.rs",
         ),
         struct(
+            name = "size",
+            kinds = [
+                "example",
+            ],
+            path = "examples/size.rs",
+        ),
+        struct(
             name = "tests",
             kinds = [
                 "test",
             ],
             path = "tests/tests.rs",
-        ),
-        struct(
-            name = "quick_main",
-            kinds = [
-                "test",
-            ],
-            path = "tests/quick_main.rs",
         ),
     ],
 )

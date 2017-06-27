@@ -16,23 +16,23 @@ description = struct(
     build_dependencies = [],
     dev_dependencies = [],
     features = [
-        "use_std",
         "default",
+        "use_std",
     ],
     targets = [
-        struct(
-            name = "log",
-            kinds = [
-                "lib",
-            ],
-            path = "src/lib.rs",
-        ),
         struct(
             name = "filters",
             kinds = [
                 "test",
             ],
             path = "tests/filters.rs",
+        ),
+        struct(
+            name = "log",
+            kinds = [
+                "lib",
+            ],
+            path = "src/lib.rs",
         ),
     ],
 )

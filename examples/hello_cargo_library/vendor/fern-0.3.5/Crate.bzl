@@ -23,6 +23,13 @@ description = struct(
     features = [],
     targets = [
         struct(
+            name = "doc_test_copy",
+            kinds = [
+                "test",
+            ],
+            path = "tests/doc_test_copy.rs",
+        ),
+        struct(
             name = "fern",
             kinds = [
                 "lib",
@@ -35,13 +42,6 @@ description = struct(
                 "test",
             ],
             path = "tests/lib.rs",
-        ),
-        struct(
-            name = "doc_test_copy",
-            kinds = [
-                "test",
-            ],
-            path = "tests/doc_test_copy.rs",
         ),
     ],
 )
