@@ -135,6 +135,22 @@ impl ToBExpr for Target {
   }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Metadep {
+  pub name: String,
+  pub min_version: String,
+}
+
+impl ToBExpr for Metadep {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "name" => self.name.to_expr(),
+      "min_version" => self.min_version.to_expr()
+    }
+  }
+}
+
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Package {
   pub id: PackageId,
@@ -148,6 +164,7 @@ pub struct Package {
   pub is_root_dependency: bool,
   pub targets: Vec<Target>,
   pub bazel_config: Config,
+  pub metadeps: Vec<Metadep>,
 }
 
 
@@ -159,6 +176,7 @@ impl ToBExpr for Package {
         "pkg_version" => b_value!(self.id.version())
       },
       "bazel_config" => self.bazel_config.to_expr(),
+      "metadeps" => self.metadeps.to_expr(),
       "dependencies" => self.dependencies.to_expr(),
       "build_dependencies" => self.build_dependencies.to_expr(),
       "dev_dependencies" => self.dev_dependencies.to_expr(),

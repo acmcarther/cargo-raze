@@ -144,6 +144,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
           dev_dependencies: Vec::new(),
           targets: Vec::new(),
           bazel_config: bazel::Config::default(),
+          metadeps: Vec::new(),
       })
       .collect::<Vec<_>>();
 
