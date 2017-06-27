@@ -17,15 +17,16 @@ def _extract_dependency_paths(dependencies, workspace_path):
 
 def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path="//"):
 
+    name = crate_bzl.package.pkg_name.replace('-', '_')
     package = crate_bzl.package
 
     # Gather list of nearly matching and exactly matching overrides
     this_override = None
     close_overrides = []
-    for override in cargo_override_bzl:
-      if package.pkg_name != override.package.pkg_name:
+    for override in cargo_override_bzl.global_settings.dependency_replacements:
+      if package.pkg_name != override.pkg_name:
         continue
-      if package.pkg_version == override.package.pkg_version:
+      if package.pkg_version == override.pkg_version:
         if not package:
           fail("Package was already set once!")
         this_override = override
@@ -33,15 +34,19 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
         close_overrides.append(override)
 
     if close_overrides and not this_override:
-      close_override_versions = [override.package.pkg_version for override in close_overrides]
+      close_override_versions = [override.pkg_version for override in close_overrides]
       print(("Did not find an exact override match for {}-{}, but found versions {}."
             + " Consider reviewing your CargoOverrides.bzl if you recently ran cargo-raze.")
             .format(package.pkg_name, package.pkg_version, close_override_versions))
 
     if this_override:
-      print("Override was present, but overrides are currently unsupported")
+      print("Override was present, using it!")
+      native.alias(
+          name = name,
+          actual = this_override.target
+      )
+      return
 
-    name = crate_bzl.package.pkg_name.replace('-', '_')
 
     contains_build_script = _contains_build_script(crate_bzl)
 

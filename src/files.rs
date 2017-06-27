@@ -92,25 +92,33 @@ pub trait ToBExpr {
   fn to_expr(&self) -> BExpr;
 }
 
-impl <T> ToBExpr for Vec<T> where T: ToBExpr {
+impl <T> ToBExpr for Vec<T> where T: ToBExpr + Ord {
   fn to_expr(&self) -> BExpr {
-    BExpr::Array(self.iter().map(|v| v.to_expr()).collect())
+    let mut array_items: Vec<&T> = self.iter().collect();
+    array_items.sort();
+    BExpr::Array(array_items.iter().map(|v| v.to_expr()).collect())
   }
 }
-impl <T> ToBExpr for HashSet<T> where T: Eq + Hash + ToBExpr {
+impl <T> ToBExpr for HashSet<T> where T: Eq + Hash + ToBExpr + Ord {
   fn to_expr(&self) -> BExpr {
-    // TODO(acmcarther): This is not stable, and will generate diffs when nothing changes
-    BExpr::Array(self.iter().map(|v| v.to_expr()).collect())
+    let mut array_items: Vec<&T> = self.iter().collect();
+    array_items.sort();
+    BExpr::Array(array_items.iter().map(|v| v.to_expr()).collect())
   }
 }
 
 impl <T> ToBExpr for HashMap<String, T> where T: ToBExpr {
   fn to_expr(&self) -> BExpr {
-    BExpr::Struct(self.iter().map(|(k, v)| (k.clone(), v.to_expr())).collect())
+    let mut map_keys: Vec<String> = self.keys().cloned().collect();
+    map_keys.sort();
+    BExpr::Struct(map_keys.into_iter().map(|k| {
+      let map_val = self.get(&k).unwrap().to_expr();
+      (k, map_val)
+    }).collect())
   }
 }
 
-impl <T, U> ToBExpr for (T, U) where T: ToBExpr, U: ToBExpr {
+impl <T, U> ToBExpr for (T, U) where T: Ord + ToBExpr, U: ToBExpr {
   fn to_expr(&self) -> BExpr {
     BExpr::Tuple(vec![self.0.to_expr(), self.1.to_expr()])
   }
@@ -161,12 +169,12 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
 load(":Crate.bzl", "description")
 load("{workspace_prefix}:Cargo.bzl", "workspace")
-load("{workspace_prefix}:CargoOverrides.bzl", "overrides")
+load("{workspace_prefix}:CargoOverrides.bzl", "override_cfg")
 
 cargo_library(
     srcs = glob(["lib.rs", "src/**/*.rs"]),
     crate_bzl = description,
-    cargo_override_bzl = overrides,
+    cargo_override_bzl = override_cfg,
     platform = workspace.platform,
     workspace_path = "{workspace_prefix}/"
 )
@@ -213,9 +221,9 @@ package(default_visibility = ["//visibility:public"])
     Ok(())
 }
 
-pub fn generate_outer_build_file(should_overwrite: bool) -> Result<(), Box<CargoError>> {
+pub fn generate_outer_build_file() -> Result<(), Box<CargoError>> {
     let outer_build_file_path = format!("./BUILD");
-    if should_overwrite || !fs::metadata(&outer_build_file_path).is_ok() {
+    if !fs::metadata(&outer_build_file_path).is_ok() {
       try!(File::create(&outer_build_file_path)
            .chain_error(|| human(format!("failed to create {}", outer_build_file_path))));
       println!("Generated {} successfully", outer_build_file_path);
@@ -234,15 +242,14 @@ cargo-raze vendor-wide override file
 Make your changes here. Bazel automatically integrates overrides from this
 file and will not overwrite it on a rerun of cargo-raze.
 
-Override entries should be of identical form to generated Crate.bzl entries.
 Properties defined here will take priority over generated properties.
 
 Reruns of cargo-raze may change the versions of your dependencies. Fear not!
 cargo-raze will warn you if it detects an override for different version of a
 dependency, to prompt you to update the specified override version.
 """
-overrides = []
-"#,);
+override_cfg = {override_cfg}
+"#, override_cfg = bazel::OverrideSettings::default().to_expr().pretty_print());
     let cargo_override_bzl_path = format!("./CargoOverrides.bzl");
     if should_overwrite || !fs::metadata(&cargo_override_bzl_path).is_ok() {
       try!(File::create(&cargo_override_bzl_path)

@@ -4,8 +4,11 @@ use cargo::util::Cfg as CargoCfg;
 use cargo::core::Package as CargoPackage;
 use std::collections::HashSet;
 use cargo::core::PackageId;
+use std::cmp::Ordering;
 
-#[derive(Debug, Clone)]
+static OVERRIDE_FILE_VERSION: &'static str = "1";
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Config {
   pub use_build_rs: bool,
   pub use_metadeps: bool
@@ -29,7 +32,7 @@ impl ToBExpr for Config {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Dependency {
   pub name: String,
   pub version: String,
@@ -44,7 +47,7 @@ impl ToBExpr for Dependency {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Platform {
   triple: String,
   flags: Vec<String>,
@@ -89,7 +92,7 @@ impl ToBExpr for Platform {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Workspace {
   pub platform: Platform,
   pub packages: Vec<Package>,
@@ -115,7 +118,7 @@ impl ToBExpr for Workspace {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Target {
   pub name: String,
   pub kinds: Vec<String>,
@@ -132,7 +135,7 @@ impl ToBExpr for Target {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Package {
   pub id: PackageId,
   pub package: CargoPackage,
@@ -161,6 +164,91 @@ impl ToBExpr for Package {
       "dev_dependencies" => self.dev_dependencies.to_expr(),
       "features" => self.features.to_expr(),
       "targets" => self.targets.to_expr()
+    }
+  }
+}
+
+impl PartialOrd for Package {
+  fn partial_cmp(&self, other: &Package) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl Ord for Package {
+  fn cmp(&self, other: &Package) -> Ordering {
+    let name_cmp = self.id.name().cmp(&other.id.name());
+
+    if name_cmp != Ordering::Equal {
+      return name_cmp
+    } else {
+      return self.id.version().cmp(&other.id.version())
+    }
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct OverrideSettings {
+  internal_override_file_version: String,
+  pub global_settings: GlobalOverrideSettings,
+}
+
+impl Default for OverrideSettings {
+  fn default() -> OverrideSettings {
+    OverrideSettings {
+      internal_override_file_version: OVERRIDE_FILE_VERSION.to_owned(),
+      global_settings: GlobalOverrideSettings::default(),
+    }
+  }
+}
+
+impl ToBExpr for OverrideSettings {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "internal_override_file_version" => self.internal_override_file_version.to_expr(),
+      "global_settings" => self.global_settings.to_expr()
+    }
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GlobalOverrideSettings {
+  pub dependency_replacements: Vec<DependencyReplacement>,
+}
+
+impl Default for GlobalOverrideSettings {
+  fn default() -> GlobalOverrideSettings {
+    GlobalOverrideSettings {
+      // This default value is an unlikely crate name, as an example for users
+      dependency_replacements: vec![DependencyReplacement {
+        pkg_name: "foo_bar_baz".to_owned(),
+        pkg_version: "8.8.8".to_owned(),
+        target: "//foo/bar:baz".to_owned(),
+      }],
+    }
+  }
+}
+
+impl ToBExpr for GlobalOverrideSettings {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "dependency_replacements" => self.dependency_replacements.to_expr()
+    }
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DependencyReplacement {
+  pub pkg_name: String,
+  pub pkg_version: String,
+  pub target: String,
+}
+
+impl ToBExpr for DependencyReplacement {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "pkg_name" => self.pkg_name.to_expr(),
+      "pkg_version" => self.pkg_version.to_expr(),
+      "target" => self.target.to_expr()
     }
   }
 }
