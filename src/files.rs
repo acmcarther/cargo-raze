@@ -11,6 +11,7 @@ use std::str;
 use std::iter;
 use std::hash::Hash;
 use std::cmp::Eq;
+use bazel::ExampleValue;
 
 // A basic expr type for bzl files
 // TODO(acmcarther): Tuples
@@ -258,7 +259,7 @@ cargo-raze will warn you if it detects an override for different version of a
 dependency, to prompt you to update the specified override version.
 """
 override_cfg = {override_cfg}
-"#, override_cfg = bazel::OverrideSettings::default().to_expr().pretty_print());
+"#, override_cfg = bazel::OverrideSettings::example_value().to_expr().pretty_print());
     let cargo_override_bzl_path = format!("./CargoOverrides.bzl");
     if should_overwrite || !fs::metadata(&cargo_override_bzl_path).is_ok() {
       try!(File::create(&cargo_override_bzl_path)

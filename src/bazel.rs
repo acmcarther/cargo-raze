@@ -8,7 +8,7 @@ use cargo::core::PackageId;
 static OVERRIDE_FILE_VERSION: &'static str = "1";
 
 /** An object that can provide a useful example value, similar to Default */
-trait ExampleValue {
+pub trait ExampleValue {
   fn example_value() -> Self;
 }
 
@@ -233,14 +233,42 @@ impl ToBExpr for CrateConfig {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct OverrideSettings {
   internal_override_file_version: String,
-  pub global_settings: GlobalOverrideSettings,
+  pub dependency_overrides: Vec<DependencyOverride>,
 }
 
-impl Default for OverrideSettings {
-  fn default() -> OverrideSettings {
+impl ExampleValue for OverrideSettings {
+  fn example_value() -> OverrideSettings {
     OverrideSettings {
       internal_override_file_version: OVERRIDE_FILE_VERSION.to_owned(),
-      global_settings: GlobalOverrideSettings::example_value(),
+      // This default value is an unlikely crate name, as an example for users
+      dependency_overrides: vec![
+        DependencyOverride {
+          pkg_name: "foo_bar_baz".to_owned(),
+          pkg_version: "8.8.8".to_owned(),
+          target_replacement: Some("//foo/bar:baz".to_owned()),
+          config_replacement: None
+        }, DependencyOverride {
+          pkg_name: "foo_bar_qux".to_owned(),
+          pkg_version: "8.8.8".to_owned(),
+          target_replacement: None,
+          config_replacement: Some(CrateConfig {
+            package: PackageIdent {
+              pkg_name: "foo_bar_qux".to_owned(),
+              pkg_version: "8.8.88".to_owned(),
+            },
+            bazel_config: Config {
+              use_build_rs: false,
+              use_metadeps: false,
+            },
+            metadeps: Vec::new(),
+            dependencies: Vec::new(),
+            build_dependencies: Vec::new(),
+            dev_dependencies: Vec::new(),
+            features: Vec::new(),
+            targets: Vec::new(),
+          })
+        }
+      ],
     }
   }
 }
@@ -249,48 +277,6 @@ impl ToBExpr for OverrideSettings {
   fn to_expr(&self) -> BExpr {
     b_struct! {
       "internal_override_file_version" => self.internal_override_file_version.to_expr(),
-      "global_settings" => self.global_settings.to_expr()
-    }
-  }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct GlobalOverrideSettings {
-  pub dependency_overrides: Vec<DependencyOverride>,
-}
-
-impl ExampleValue for GlobalOverrideSettings {
-  fn example_value() -> GlobalOverrideSettings {
-    GlobalOverrideSettings {
-      // This default value is an unlikely crate name, as an example for users
-      dependency_overrides: vec![DependencyOverride {
-        pkg_name: "foo_bar_baz".to_owned(),
-        pkg_version: "8.8.8".to_owned(),
-        target_replacement: Some("//foo/bar:baz".to_owned()),
-        config_replacement: Some(CrateConfig {
-          package: PackageIdent {
-            pkg_name: "foo_bar_baz".to_owned(),
-            pkg_version: "8.8.88".to_owned(),
-          },
-          bazel_config: Config {
-            use_build_rs: false,
-            use_metadeps: false,
-          },
-          metadeps: Vec::new(),
-          dependencies: Vec::new(),
-          build_dependencies: Vec::new(),
-          dev_dependencies: Vec::new(),
-          features: Vec::new(),
-          targets: Vec::new(),
-        })
-      }],
-    }
-  }
-}
-
-impl ToBExpr for GlobalOverrideSettings {
-  fn to_expr(&self) -> BExpr {
-    b_struct! {
       "dependency_overrides" => self.dependency_overrides.to_expr()
     }
   }
