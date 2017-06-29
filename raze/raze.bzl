@@ -23,7 +23,7 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
     # Gather list of nearly matching and exactly matching overrides
     this_override = None
     close_overrides = []
-    for override in cargo_override_bzl.global_settings.dependency_replacements:
+    for override in cargo_override_bzl.dependency_overrides:
       if package.pkg_name != override.pkg_name:
         continue
       if package.pkg_version == override.pkg_version:
@@ -39,13 +39,16 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
             + " Consider reviewing your CargoOverrides.bzl if you recently ran cargo-raze.")
             .format(package.pkg_name, package.pkg_version, close_override_versions))
 
-    if this_override:
+    if this_override and this_override.target_replacement:
       print("Override was present, using it!")
       native.alias(
           name = name,
           actual = this_override.target
       )
       return
+
+    if this_override and this_override.config_replacement:
+      print("A config replacement was detected for {}-{}, but the feature is currently unimplemented".format(package.pkg_name, package.pkg_version))
 
 
     contains_build_script = _contains_build_script(crate_bzl)
