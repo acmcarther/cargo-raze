@@ -17,17 +17,15 @@ def _extract_dependency_paths(dependencies, workspace_path):
 
 def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path="//"):
 
-    name = crate_bzl.package.pkg_name.replace('-', '_')
-    package = crate_bzl.package
-
     # Gather list of nearly matching and exactly matching overrides
     this_override = None
     close_overrides = []
+    default_package = crate_bzl.package
     for override in cargo_override_bzl.dependency_overrides:
-      if package.pkg_name != override.pkg_name:
+      if default_package.pkg_name != override.pkg_name:
         continue
-      if package.pkg_version == override.pkg_version:
-        if not package:
+      if default_package.pkg_version == override.pkg_version:
+        if this_override:
           fail("Package was already set once!")
         this_override = override
       else:
@@ -37,28 +35,31 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
       close_override_versions = [override.pkg_version for override in close_overrides]
       print(("Did not find an exact override match for {}-{}, but found versions {}."
             + " Consider reviewing your CargoOverrides.bzl if you recently ran cargo-raze.")
-            .format(package.pkg_name, package.pkg_version, close_override_versions))
+            .format(default_package.pkg_name, default_package.pkg_version, close_override_versions))
 
-    if this_override and this_override.target_replacement:
-      print("Override was present, using it!")
-      native.alias(
-          name = name,
-          actual = this_override.target
-      )
-      return
+    source_override = None
+    if this_override:
+      if this_override.config_replacement:
+        crate_bzl = this_override.config_replacement
 
-    if this_override and this_override.config_replacement:
-      print("A config replacement was detected for {}-{}, but the feature is currently unimplemented".format(package.pkg_name, package.pkg_version))
+      if this_override.target_replacement:
+        name = crate_bzl.package.pkg_name.replace('-', '_')
 
-    if this_override and this_override.source_replacement:
-      print("A source replacement was detected for {}-{}, but the feature is currently unimplemented".format(package.pkg_name, package.pkg_version))
+        native.alias(
+            name = name,
+            actual = this_override.target
+        )
+        return
 
+      if this_override.source_replacement:
+        source_override = this_override.source_replacement
+
+    name = crate_bzl.package.pkg_name.replace('-', '_')
     contains_build_script = _contains_build_script(crate_bzl)
 
     for target in crate_bzl.targets:
         if "lib" in target.kinds:
             deps = _extract_dependency_paths(crate_bzl.dependencies, workspace_path)
-            full_srcs = srcs
             out_dir_tar = None
             if contains_build_script:
               out_dir_tar = ":" + name + "_build_script_executor"
@@ -72,7 +73,7 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
 
             rust_library(
                 name = target_name,
-                srcs = full_srcs,
+                srcs = source_override or srcs,
                 crate_root = target.path,
                 deps = deps,
                 rustc_flags = [
@@ -99,7 +100,8 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
 
             native.genrule(
                 name = name + "_build_script_executor",
-                srcs = srcs + native.glob(["*"]),
+                # TODO: This may not play nice with source_replacement
+                srcs = source_override or (srcs + native.glob(["*"])),
                 outs = [name + "_out_dir_outputs.tar.gz"],
                 tools = [":" + name + "_build_script"],
                 cmd = "mkdir " + name + "_out_dir_outputs/;"
