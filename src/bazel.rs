@@ -4,9 +4,13 @@ use cargo::util::Cfg as CargoCfg;
 use cargo::core::Package as CargoPackage;
 use std::collections::HashSet;
 use cargo::core::PackageId;
-use std::cmp::Ordering;
 
 static OVERRIDE_FILE_VERSION: &'static str = "1";
+
+/** An object that can provide a useful example value, similar to Default */
+trait ExampleValue {
+  fn example_value() -> Self;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Config {
@@ -95,7 +99,7 @@ impl ToBExpr for Platform {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Workspace {
   pub platform: Platform,
-  pub packages: Vec<Package>,
+  pub packages: Vec<CrateConfig>,
 }
 
 impl Workspace {
@@ -103,7 +107,7 @@ impl Workspace {
              platform_triple: &str,
              platform_attrs: &Vec<CargoCfg>) -> Workspace {
     Workspace {
-      packages: packages.clone(),
+      packages: packages.iter().map(|p| p.to_crate_config()).collect(),
       platform: Platform::new(platform_triple, platform_attrs),
     }
   }
@@ -150,8 +154,7 @@ impl ToBExpr for Metadep {
   }
 }
 
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Package {
   pub id: PackageId,
   pub package: CargoPackage,
@@ -167,14 +170,55 @@ pub struct Package {
   pub metadeps: Vec<Metadep>,
 }
 
+impl Package {
+  pub fn to_crate_config(&self) -> CrateConfig {
+    CrateConfig {
+      package: PackageIdent {
+        pkg_name: self.id.name().to_owned(),
+        pkg_version: self.id.version().to_string(),
+      },
+      bazel_config: self.bazel_config.clone(),
+      metadeps: self.metadeps.clone(),
+      dependencies: self.dependencies.clone(),
+      build_dependencies: self.build_dependencies.clone(),
+      dev_dependencies: self.dev_dependencies.clone(),
+      features: self.features.iter().cloned().collect(),
+      targets: self.targets.clone(),
+    }
+  }
+}
 
-impl ToBExpr for Package {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PackageIdent {
+  pub pkg_name: String,
+  pub pkg_version: String,
+}
+
+impl ToBExpr for PackageIdent {
   fn to_expr(&self) -> BExpr {
     b_struct! {
-      "package" => b_struct! {
-        "pkg_name" => b_value!(self.id.name()),
-        "pkg_version" => b_value!(self.id.version())
-      },
+      "pkg_name" => self.pkg_name.to_expr(),
+      "pkg_version" => self.pkg_version.to_expr()
+    }
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CrateConfig {
+  pub package: PackageIdent,
+  pub bazel_config: Config,
+  pub metadeps: Vec<Metadep>,
+  pub dependencies: Vec<Dependency>,
+  pub build_dependencies: Vec<Dependency>,
+  pub dev_dependencies: Vec<Dependency>,
+  pub features: Vec<String>,
+  pub targets: Vec<Target>,
+}
+
+impl ToBExpr for CrateConfig {
+  fn to_expr(&self) -> BExpr {
+    b_struct! {
+      "package" => self.package.to_expr(),
       "bazel_config" => self.bazel_config.to_expr(),
       "metadeps" => self.metadeps.to_expr(),
       "dependencies" => self.dependencies.to_expr(),
@@ -182,24 +226,6 @@ impl ToBExpr for Package {
       "dev_dependencies" => self.dev_dependencies.to_expr(),
       "features" => self.features.to_expr(),
       "targets" => self.targets.to_expr()
-    }
-  }
-}
-
-impl PartialOrd for Package {
-  fn partial_cmp(&self, other: &Package) -> Option<Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl Ord for Package {
-  fn cmp(&self, other: &Package) -> Ordering {
-    let name_cmp = self.id.name().cmp(&other.id.name());
-
-    if name_cmp != Ordering::Equal {
-      return name_cmp
-    } else {
-      return self.id.version().cmp(&other.id.version())
     }
   }
 }
@@ -214,7 +240,7 @@ impl Default for OverrideSettings {
   fn default() -> OverrideSettings {
     OverrideSettings {
       internal_override_file_version: OVERRIDE_FILE_VERSION.to_owned(),
-      global_settings: GlobalOverrideSettings::default(),
+      global_settings: GlobalOverrideSettings::example_value(),
     }
   }
 }
@@ -230,17 +256,33 @@ impl ToBExpr for OverrideSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GlobalOverrideSettings {
-  pub dependency_replacements: Vec<DependencyReplacement>,
+  pub dependency_overrides: Vec<DependencyOverride>,
 }
 
-impl Default for GlobalOverrideSettings {
-  fn default() -> GlobalOverrideSettings {
+impl ExampleValue for GlobalOverrideSettings {
+  fn example_value() -> GlobalOverrideSettings {
     GlobalOverrideSettings {
       // This default value is an unlikely crate name, as an example for users
-      dependency_replacements: vec![DependencyReplacement {
+      dependency_overrides: vec![DependencyOverride {
         pkg_name: "foo_bar_baz".to_owned(),
         pkg_version: "8.8.8".to_owned(),
-        target: "//foo/bar:baz".to_owned(),
+        target_replacement: Some("//foo/bar:baz".to_owned()),
+        config_replacement: Some(CrateConfig {
+          package: PackageIdent {
+            pkg_name: "foo_bar_baz".to_owned(),
+            pkg_version: "8.8.88".to_owned(),
+          },
+          bazel_config: Config {
+            use_build_rs: false,
+            use_metadeps: false,
+          },
+          metadeps: Vec::new(),
+          dependencies: Vec::new(),
+          build_dependencies: Vec::new(),
+          dev_dependencies: Vec::new(),
+          features: Vec::new(),
+          targets: Vec::new(),
+        })
       }],
     }
   }
@@ -249,24 +291,26 @@ impl Default for GlobalOverrideSettings {
 impl ToBExpr for GlobalOverrideSettings {
   fn to_expr(&self) -> BExpr {
     b_struct! {
-      "dependency_replacements" => self.dependency_replacements.to_expr()
+      "dependency_overrides" => self.dependency_overrides.to_expr()
     }
   }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DependencyReplacement {
+pub struct DependencyOverride {
   pub pkg_name: String,
   pub pkg_version: String,
-  pub target: String,
+  pub target_replacement: Option<String>,
+  pub config_replacement: Option<CrateConfig>,
 }
 
-impl ToBExpr for DependencyReplacement {
+impl ToBExpr for DependencyOverride {
   fn to_expr(&self) -> BExpr {
     b_struct! {
       "pkg_name" => self.pkg_name.to_expr(),
       "pkg_version" => self.pkg_version.to_expr(),
-      "target" => self.target.to_expr()
+      "target_replacement" => self.target_replacement.to_expr(),
+      "config_replacement" => self.config_replacement.to_expr()
     }
   }
 }

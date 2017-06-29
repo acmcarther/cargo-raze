@@ -16,7 +16,8 @@ use std::cmp::Eq;
 // TODO(acmcarther): Tuples
 pub enum BExpr {
   Bool(bool),
-  Value(String),
+  Optional(Option<Box<BExpr>>),
+  Str(String),
   Tuple(Vec<BExpr>),
   Array(Vec<BExpr>),
   Struct(Vec<(String, BExpr)>),
@@ -38,7 +39,9 @@ impl BExpr {
     match self {
       &BExpr::Bool(true) => "True".to_owned(),
       &BExpr::Bool(false) => "False".to_owned(),
-      &BExpr::Value(ref s) => format!("\"{}\"", s),
+      &BExpr::Optional(None) => "None".to_owned(),
+      &BExpr::Optional(Some(ref a)) => a.pretty_print_spaced(space_count),
+      &BExpr::Str(ref s) => format!("\"{}\"", s),
       &BExpr::Tuple(ref a) if a.len() == 0 => format!("()"),
       &BExpr::Tuple(ref a) => format!("(\n{}{})", a.iter()
                               .map(|i| format!("{}{},\n", spaces, i.pretty_print_spaced(space_count + 4)))
@@ -84,12 +87,18 @@ macro_rules! b_array {
 // Produces a string-ish value BExpr
 macro_rules! b_value {
   ($value:expr) => {
-    BExpr::Value($value.to_string())
+    BExpr::Str($value.to_string())
   };
 }
 
 pub trait ToBExpr {
   fn to_expr(&self) -> BExpr;
+}
+
+impl <T> ToBExpr for Option<T> where T: ToBExpr {
+  fn to_expr(&self) -> BExpr {
+    BExpr::Optional(self.as_ref().map(|v| Box::new(v.to_expr())))
+  }
 }
 
 impl <T> ToBExpr for Vec<T> where T: ToBExpr + Ord {
@@ -146,7 +155,7 @@ DO NOT MODIFY! Instead, update CargoOverrides.bzl.
 description = {expr}
 "#,
         name = pkg.full_name,
-        expr = pkg.to_expr().pretty_print());
+        expr = pkg.to_crate_config().to_expr().pretty_print());
 
     let cargo_bzl_path = format!("{}Crate.bzl", &pkg.path);
     try!(File::create(&cargo_bzl_path)
