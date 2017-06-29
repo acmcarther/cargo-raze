@@ -50,6 +50,8 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
     if this_override and this_override.config_replacement:
       print("A config replacement was detected for {}-{}, but the feature is currently unimplemented".format(package.pkg_name, package.pkg_version))
 
+    if this_override and this_override.source_replacement:
+      print("A source replacement was detected for {}-{}, but the feature is currently unimplemented".format(package.pkg_name, package.pkg_version))
 
     contains_build_script = _contains_build_script(crate_bzl)
 

@@ -243,17 +243,25 @@ impl ExampleValue for OverrideSettings {
       // This default value is an unlikely crate name, as an example for users
       dependency_overrides: vec![
         DependencyOverride {
-          pkg_name: "foo_bar_baz".to_owned(),
+          pkg_name: "bazel_mock_foo".to_owned(),
           pkg_version: "8.8.8".to_owned(),
-          target_replacement: Some("//foo/bar:baz".to_owned()),
+          target_replacement: Some("//any_path/foo:separate_foo_target".to_owned()),
+          source_replacement: None,
           config_replacement: None
         }, DependencyOverride {
-          pkg_name: "foo_bar_qux".to_owned(),
+          pkg_name: "bazel_mock_bar".to_owned(),
           pkg_version: "8.8.8".to_owned(),
           target_replacement: None,
+          source_replacement: Some("//any_path/bar:bar_sources".to_owned()),
+          config_replacement: None
+        }, DependencyOverride {
+          pkg_name: "bazel_mock_baz".to_owned(),
+          pkg_version: "8.8.8".to_owned(),
+          target_replacement: None,
+          source_replacement: None,
           config_replacement: Some(CrateConfig {
             package: PackageIdent {
-              pkg_name: "foo_bar_qux".to_owned(),
+              pkg_name: "bazel_mock_baz".to_owned(),
               pkg_version: "8.8.88".to_owned(),
             },
             bazel_config: Config {
@@ -287,6 +295,7 @@ pub struct DependencyOverride {
   pub pkg_name: String,
   pub pkg_version: String,
   pub target_replacement: Option<String>,
+  pub source_replacement: Option<String>,
   pub config_replacement: Option<CrateConfig>,
 }
 
@@ -296,6 +305,7 @@ impl ToBExpr for DependencyOverride {
       "pkg_name" => self.pkg_name.to_expr(),
       "pkg_version" => self.pkg_version.to_expr(),
       "target_replacement" => self.target_replacement.to_expr(),
+      "source_replacement" => self.source_replacement.to_expr(),
       "config_replacement" => self.config_replacement.to_expr()
     }
   }

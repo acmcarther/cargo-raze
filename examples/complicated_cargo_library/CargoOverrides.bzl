@@ -14,18 +14,20 @@ override_cfg = struct(
     internal_override_file_version = "1",
     dependency_overrides = [
         struct(
-            pkg_name = "foo_bar_baz",
+            pkg_name = "bazel_mock_bar",
             pkg_version = "8.8.8",
-            target_replacement = "//foo/bar:baz",
+            target_replacement = None,
+            source_replacement = "//any_path/bar:bar_sources",
             config_replacement = None,
         ),
         struct(
-            pkg_name = "foo_bar_qux",
+            pkg_name = "bazel_mock_baz",
             pkg_version = "8.8.8",
             target_replacement = None,
+            source_replacement = None,
             config_replacement = struct(
                 package = struct(
-                    pkg_name = "foo_bar_qux",
+                    pkg_name = "bazel_mock_baz",
                     pkg_version = "8.8.88",
                 ),
                 bazel_config = struct(
@@ -39,6 +41,13 @@ override_cfg = struct(
                 features = [],
                 targets = [],
             ),
+        ),
+        struct(
+            pkg_name = "bazel_mock_foo",
+            pkg_version = "8.8.8",
+            target_replacement = "//any_path/foo:separate_foo_target",
+            source_replacement = None,
+            config_replacement = None,
         ),
     ],
 )
