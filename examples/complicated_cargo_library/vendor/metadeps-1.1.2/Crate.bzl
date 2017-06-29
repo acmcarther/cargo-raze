@@ -12,6 +12,7 @@ description = struct(
         use_build_rs = True,
         use_metadeps = False,
     ),
+    metadeps = [],
     dependencies = [
         struct(
             name = "error-chain",

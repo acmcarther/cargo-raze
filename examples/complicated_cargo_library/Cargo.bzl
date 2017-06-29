@@ -81,6 +81,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "memchr",
@@ -130,6 +131,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -195,6 +197,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "winapi",
@@ -235,6 +238,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -261,6 +265,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "libc",
@@ -300,6 +305,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "error-chain",
@@ -343,6 +349,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -373,6 +380,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "aho-corasick",
@@ -543,6 +551,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -566,6 +575,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "libc",
@@ -594,6 +604,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "thread-id",
@@ -626,6 +637,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -677,6 +689,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "void",
@@ -705,6 +718,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -735,6 +749,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -758,6 +773,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -781,6 +797,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [],
             build_dependencies = [],
             dev_dependencies = [],
@@ -804,6 +821,7 @@ workspace = struct(
                 use_build_rs = True,
                 use_metadeps = False,
             ),
+            metadeps = [],
             dependencies = [
                 struct(
                     name = "libc",

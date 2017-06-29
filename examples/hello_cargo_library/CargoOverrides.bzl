@@ -12,13 +12,33 @@ dependency, to prompt you to update the specified override version.
 """
 override_cfg = struct(
     internal_override_file_version = "1",
-    global_settings = struct(
-        dependency_replacements = [
-            struct(
-                pkg_name = "foo_bar_baz",
-                pkg_version = "8.8.8",
-                target = "//foo/bar:baz",
+    dependency_overrides = [
+        struct(
+            pkg_name = "foo_bar_baz",
+            pkg_version = "8.8.8",
+            target_replacement = "//foo/bar:baz",
+            config_replacement = None,
+        ),
+        struct(
+            pkg_name = "foo_bar_qux",
+            pkg_version = "8.8.8",
+            target_replacement = None,
+            config_replacement = struct(
+                package = struct(
+                    pkg_name = "foo_bar_qux",
+                    pkg_version = "8.8.88",
+                ),
+                bazel_config = struct(
+                    use_build_rs = False,
+                    use_metadeps = False,
+                ),
+                metadeps = [],
+                dependencies = [],
+                build_dependencies = [],
+                dev_dependencies = [],
+                features = [],
+                targets = [],
             ),
-        ],
-    ),
+        ),
+    ],
 )
