@@ -4,6 +4,6 @@ rust_binary(
     name = "hello",
     srcs = ["src/main.rs"],
     deps = [
-        "//examples/complicated_cargo_library/vendor:regex",
+        "//complicated_cargo_library/vendor:regex",
     ],
 )
