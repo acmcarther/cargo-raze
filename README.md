@@ -42,7 +42,7 @@ Then, in a directory containing 'Cargo.toml'. Project root is fine:
 ```
 cargo install cargo-vendor
 cargo install cargo-raze
-cargo generate_lockfile
+cargo generate-lockfile
 cargo vendor -x
 cargo raze "//path/to/vendor"
 ```
