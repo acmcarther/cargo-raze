@@ -1,5 +1,7 @@
 # cargo raze
 
+[![Build Status](https://travis-ci.org/acmcarther/cargo-raze.svg?branch=master)](https://travis-ci.org/acmcarther/cargo-raze)
+
 A cargo subcommand to generate platform-specific BUILD files.
 
 Also, a bazel ruleset for using the outputs of that cargo subcommand.  
