@@ -154,7 +154,8 @@ impl ToBExpr for Metadep {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Builder, Debug, Clone)]
+#[builder(pattern="immutable", setter(prefix="set"))]
 pub struct Package {
   pub id: PackageId,
   pub package: CargoPackage,
