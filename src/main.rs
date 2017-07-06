@@ -1,7 +1,5 @@
 extern crate cargo;
 extern crate rustc_serialize;
-#[macro_use]
-extern crate derive_builder;
 
 #[macro_use]
 mod files;
