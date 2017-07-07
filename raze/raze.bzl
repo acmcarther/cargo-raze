@@ -186,7 +186,7 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
       _generate_build_script_targets(
           name,
           srcs,
-          native.glob(["*"]),
+          native.glob(["**"], exclude=srcs),
           build_script_target,
           crate_bzl,
           workspace_path,
