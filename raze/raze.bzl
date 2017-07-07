@@ -84,7 +84,7 @@ def _generate_build_script_targets(name, srcs, data, target, crate_bzl, workspac
     native.genrule(
         name = name + "_build_script_executor",
         # TODO: This may not play nice with source_replacement
-        srcs = srcs,
+        srcs = srcs + data,
         outs = [name + "_out_dir_outputs.tar.gz"],
         tools = [":" + name + "_build_script"],
         cmd = "mkdir " + name + "_out_dir_outputs/;"
