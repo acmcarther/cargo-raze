@@ -28,22 +28,22 @@ struct Options {
     flag_quiet: Option<bool>,
     flag_host: Option<String>,
     flag_color: Option<String>,
-    flag_overwrite: Option<bool>,
+    flag_targets: Option<String>,
 }
 
 const USAGE: &'static str = r#"
-Generate Cargo.bzl files for your pre-vendored Cargo dependencies.
+Generate Bazel BUILD files for your pre-vendored Cargo dependencies.
 
 Usage:
     cargo raze [options] [<buildprefix>]
 
 Options:
-    -h, --help               Print this message
-    -v, --verbose            Use verbose output
-    --host HOST              Registry index to sync with
-    -q, --quiet              No output printed to stdout
-    --color WHEN             Coloring: auto, always, never
-    --overwrite              Overwrite CargoOverride.bzl
+    -h, --help                Print this message
+    -v, --verbose             Use verbose output
+    --host HOST               Registry index to sync with
+    -q, --quiet               No output printed to stdout
+    --color WHEN              Coloring: auto, always, never
+    --targets TARGETS         List of comma-separated target triples to generate BUILD for
 "#;
 
 fn main() {
@@ -74,10 +74,21 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         .ok_or(human("root crate should be in cargo resolve")));
     let root_direct_deps = resolve.deps(&root_package_id).cloned().collect::<HashSet<_>>();
 
-    let platform_triple = config.rustc()?.host.clone();
-    let platform_attrs = fetch_attrs(&platform_triple);
+    let targets_str = options.flag_targets.expect("--targets flag is mandatory");
+    let platform_triple_env_pairs = targets_str
+      .split(',')
+      .map(|triple| {
+        // Non lexical borrow dodge
+        let attrs = fetch_attrs(triple);
+        (triple, attrs)
+      })
+      .collect::<Vec<_>>();
 
     let mut raze_packages = Vec::new();
+
+    // TODO(acmcarther): Remove hack: This just generates the first triple
+    let (platform_triple, platform_attrs) = platform_triple_env_pairs.get(0).unwrap().clone();
+
     for id in try!(planning::find_all_package_ids(options.flag_host, &config, &resolve)) {
         let package = packages.get(&id).unwrap().clone();
         let features = resolve.features(&id).cloned().unwrap_or(HashSet::new());
@@ -110,16 +121,20 @@ fn real_main(options: Options, config: &Config) -> CliResult {
     }
 
     for package in &raze_packages {
-      try!(files::generate_crate_bzl_file(&package));
+      //try!(files::generate_crate_bzl_file(&package));
       try!(files::generate_crate_build_file(&package, &workspace_prefix));
     }
 
     let workspace = bazel::Workspace::new(&raze_packages, &platform_triple, &platform_attrs);
 
-    try!(files::generate_vendor_build_file(&raze_packages, &workspace_prefix));
+    // TODO(acmcarther): Support this, somehow... Right now theres not an obvious choice for
+    // platform
+    //try!(files::generate_vendor_build_file(&raze_packages, &workspace_prefix));
     try!(files::generate_workspace_bzl_file(&workspace));
-    try!(files::generate_override_bzl_file(options.flag_overwrite.unwrap_or(false)));
-    try!(files::generate_outer_build_file());
+
+    // TODO(acmcarther): Remove, override is unsupported
+    //try!(files::generate_override_bzl_file(false));
+    //try!(files::generate_outer_build_file());
 
     Ok(())
 }
@@ -145,17 +160,12 @@ fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> Result<String, 
 
 
 /**
- * Generates an artificial set of Cfg objects based on a standard linux system.
- *
- * This function is meant to be temporary. It should be replaced by proper platform introspection
- * similar to Cargo's own:
- * cargo::ops::cargo_rustc::context::Context::probe_target_info_kind
- * https://github.com/rust-lang/cargo/blob/f5348cc321a032db95cd18e3129a4392d2e0a892/src/cargo/ops/cargo_rustc/context.rs#L199
+ * Gets the proper system attributes for the provided platform triple using rustc.
  */
 fn fetch_attrs(target: &str) -> Vec<Cfg> {
     let args = vec![
-      "--print=\"cfg\"".to_owned(),
-      format!("--target={}", target)
+      format!("--target={}", target),
+      "--print=cfg".to_owned(),
     ];
     let output = Command::new("rustc")
         .args(&args)
@@ -163,18 +173,21 @@ fn fetch_attrs(target: &str) -> Vec<Cfg> {
         .expect(&format!("could not run rustc to fetch attrs for target {}", target));
 
     if !output.status.success() {
-      panic!(format!("getting target attrs for {} failed with status: '{}' \nstdout: '''{}'''\nstderr: '''{}'''", 
+      panic!(format!("getting target attrs for {} failed with status: '{}' \n\
+                     stdout: {}\n\
+                     stderr: {}",
                      target,
                      output.status,
                      String::from_utf8(output.stdout).unwrap_or("[unparseable bytes]".to_owned()),
                      String::from_utf8(output.stderr).unwrap_or("[unparseable bytes]".to_owned())))
     }
 
-    let attr_str = String::from_utf8(output.stdout).expect("successful run of rustc's output to be parsable");
+    let attr_str = String::from_utf8(output.stdout)
+        .expect("successful run of rustc's output to be utf8");
 
     attr_str.lines()
         .map(Cfg::from_str)
-        .map(|cfg| cfg.expect("attrs from rustc should be parsable"))
+        .map(|cfg| cfg.expect("attrs from rustc should be parsable into Cargo Cfg"))
         .collect()
 }
 
