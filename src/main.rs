@@ -13,6 +13,7 @@ use cargo::util::ChainError;
 use cargo::util::Config;
 use cargo::util::human;
 use std::collections::HashSet;
+use std::process::Command;
 use std::env;
 use std::fs;
 use std::str::FromStr;
@@ -73,8 +74,8 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         .ok_or(human("root crate should be in cargo resolve")));
     let root_direct_deps = resolve.deps(&root_package_id).cloned().collect::<HashSet<_>>();
 
-    let platform_attrs = generic_linux_cfgs();
     let platform_triple = config.rustc()?.host.clone();
+    let platform_attrs = fetch_attrs(&platform_triple);
 
     let mut raze_packages = Vec::new();
     for id in try!(planning::find_all_package_ids(options.flag_host, &config, &resolve)) {
@@ -151,28 +152,29 @@ fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> Result<String, 
  * cargo::ops::cargo_rustc::context::Context::probe_target_info_kind
  * https://github.com/rust-lang/cargo/blob/f5348cc321a032db95cd18e3129a4392d2e0a892/src/cargo/ops/cargo_rustc/context.rs#L199
  */
-fn generic_linux_cfgs() -> Vec<Cfg> {
-    let hardcoded_properties =
-r#"debug_assertions
-target_arch="x86_64"
-target_endian="little"
-target_env="gnu"
-target_family="unix"
-target_feature="sse"
-target_feature="sse2"
-target_has_atomic="16"
-target_has_atomic="32"
-target_has_atomic="64"
-target_has_atomic="8"
-target_has_atomic="ptr"
-target_os="linux"
-target_pointer_width="64"
-target_thread_local
-target_vendor="unknown"
-unix"#;
-    hardcoded_properties.lines()
-      .map(Cfg::from_str)
-      .map(|cfg| cfg.expect("hardcoded values should be parsable"))
-      .collect()
+fn fetch_attrs(target: &str) -> Vec<Cfg> {
+    let args = vec![
+      "--print=\"cfg\"".to_owned(),
+      format!("--target={}", target)
+    ];
+    let output = Command::new("rustc")
+        .args(&args)
+        .output()
+        .expect(&format!("could not run rustc to fetch attrs for target {}", target));
+
+    if !output.status.success() {
+      panic!(format!("getting target attrs for {} failed with status: '{}' \nstdout: '''{}'''\nstderr: '''{}'''", 
+                     target,
+                     output.status,
+                     String::from_utf8(output.stdout).unwrap_or("[unparseable bytes]".to_owned()),
+                     String::from_utf8(output.stderr).unwrap_or("[unparseable bytes]".to_owned())))
+    }
+
+    let attr_str = String::from_utf8(output.stdout).expect("successful run of rustc's output to be parsable");
+
+    attr_str.lines()
+        .map(Cfg::from_str)
+        .map(|cfg| cfg.expect("attrs from rustc should be parsable"))
+        .collect()
 }
 
