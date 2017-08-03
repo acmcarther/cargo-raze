@@ -11,7 +11,7 @@ rust_binary(
     name = x11_arm_unknown_linux_musleabi_build_script
     srcs = glob(["*", "src/**/*.rs"]),
     crate_root = "build.rs",
-    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc_arm_unknown_linux_musleabi", "//complicated_cargo_library/vendor/metadeps-1.1.2:metadeps"],
+    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc_arm_unknown_linux_musleabi", "//complicated_cargo_library/vendor/metadeps-1.1.2:metadeps_arm_unknown_linux_musleabi"],
     rustc_flags = [
         "--cap-lints allow",
         "--target=arm-unknown-linux-musleabi"
