@@ -56,7 +56,7 @@ impl BuildFile {
   pub fn write_self(self) -> Result<(), Box<CargoError>> {
     let mut loads_sorted = self.load_statements.into_iter().collect::<Vec<_>>();
     loads_sorted.sort();
-    let final_contents = format!("{}\n{}\n{}",
+    let final_contents = format!("{}\n{}\n\n{}",
                                  self.prelude,
                                  loads_sorted.join("\n"),
                                  self.build_rules.join("\n"));

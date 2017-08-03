@@ -195,7 +195,7 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
       }
 
       if target.kinds.contains(&"custom-build".to_owned()) {
-        if lib_target.is_some() {
+        if build_script_target.is_some() {
           panic!("package {} had more than one 'custom-build' type target!", crate_name_sanitized)
         }
         build_script_target = Some(target.clone())
@@ -206,14 +206,14 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 
     let platform_triple_sanitized = platform_triple.to_owned().replace("-", "_");
     let mut build_rules = Vec::new();
-    let mut features_sorted = pkg.features.iter().cloned().collect::<Vec<_>>();
+    let mut features_sorted = pkg.features.iter().map(|f| format!("\"{}\"", f)).collect::<Vec<_>>();
     features_sorted.sort();
     // TODO: deduplicate "normal_deps" and "build_deps"
     let normal_deps = {
       let mut out = Vec::new();
       for dep in pkg.dependencies.clone() {
         let sanitized_dependency_name = dep.name.to_owned().replace("-", "_");
-        out.push(format!("\"{workspace_prefix}vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
+        out.push(format!("\"{workspace_prefix}/vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
                 workspace_prefix = workspace_prefix,
                 dependency_name = dep.name,
                 dependency_version = dep.version,
@@ -225,7 +225,7 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
       let mut out = Vec::new();
       for dep in pkg.build_dependencies.clone() {
         let sanitized_dependency_name = dep.name.to_owned().replace("-", "_");
-        out.push(format!("\"{workspace_prefix}vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
+        out.push(format!("\"{workspace_prefix}/vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
                 workspace_prefix = workspace_prefix,
                 dependency_name = dep.name,
                 dependency_version = dep.version,
@@ -242,12 +242,12 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 r#"rust_binary(
     name = {crate_name_sanitized}_{platform_triple_sanitized}_build_script
     srcs = glob(["*", "src/**/*.rs"]),
-    crate_root = {real_build_script_target_path},
+    crate_root = "{real_build_script_target_path}",
     deps = [{deps}],
     rustc_flags = [
         "--cap-lints allow",
     ],
-    crate_features = [{crate_features}]
+    crate_features = [{crate_features}],
 )"#,
           crate_name_sanitized = crate_name_sanitized,
           platform_triple_sanitized = platform_triple_sanitized,
@@ -264,7 +264,7 @@ r#"genrule(
     outs = ["{crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs.tar.gz"],
     tools = [":{crate_name_sanitized}_{platform_triple_sanitized}_build_script"],
     cmd = "mkdir {crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs/;"
-        + " (export CARGO_MANIFEST_DIR=\"$$PWD/{workspace_prefix_sans_initial_slashes}vendor/{crate_name}-{crate_version}\";"
+        + " (export CARGO_MANIFEST_DIR=\"$$PWD/{workspace_prefix_sans_initial_slashes}/vendor/{crate_name}-{crate_version}\";"
         + " export TARGET='{platform_triple}';"
         + " export RUST_BACKTRACE=1;"
         + " export OUT_DIR=$$PWD/{crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs;"
@@ -298,7 +298,7 @@ r#"alias(
       }
 
       let out_dir_tar = if build_script_target.is_some() {
-        format!("\"{crate_name_sanitized}_{platform_triple_sanitized}_build_script_executor\"",
+        format!("\":{crate_name_sanitized}_{platform_triple_sanitized}_build_script_executor\"",
                 crate_name_sanitized = crate_name_sanitized,
                 platform_triple_sanitized = platform_triple_sanitized)
       } else {
@@ -310,17 +310,18 @@ r#"alias(
       let library_rule = format!(
 r#"rust_library(
     name = "{target_name_sanitized}_{platform_triple_sanitized}",
-    crate_root = target_path,
+    crate_root = "{target_path}",
     srcs = glob(["lib.rs", "src/**/*.rs"]),
     deps = [{deps}],
     rustc_flags = [
         "--cap-lints allow",
     ],
-    out_dir_tar = {out_dir_tar}
-    crate_features = [{crate_features}]
+    out_dir_tar = {out_dir_tar},
+    crate_features = [{crate_features}],
 )"#,
           target_name_sanitized = target_name_sanitized,
           platform_triple_sanitized = platform_triple_sanitized,
+          target_path = real_lib_target.path,
           crate_features = features_sorted.join(", "),
           deps = deps_sorted.join(", "),
           out_dir_tar = out_dir_tar);
