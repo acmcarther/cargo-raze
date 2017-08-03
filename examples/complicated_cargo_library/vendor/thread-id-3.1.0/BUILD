@@ -11,9 +11,10 @@ rust_library(
     name = "thread_id_arm_unknown_linux_musleabi",
     crate_root = "src/lib.rs",
     srcs = glob(["lib.rs", "src/**/*.rs"]),
-    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc"],
+    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc_arm_unknown_linux_musleabi"],
     rustc_flags = [
         "--cap-lints allow",
+        "--target=arm-unknown-linux-musleabi"
     ],
     out_dir_tar = None,
     crate_features = [],

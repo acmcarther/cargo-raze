@@ -11,9 +11,10 @@ rust_binary(
     name = x11_arm_unknown_linux_musleabi_build_script
     srcs = glob(["*", "src/**/*.rs"]),
     crate_root = "build.rs",
-    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc", "//complicated_cargo_library/vendor/metadeps-1.1.2:metadeps"],
+    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc_arm_unknown_linux_musleabi", "//complicated_cargo_library/vendor/metadeps-1.1.2:metadeps"],
     rustc_flags = [
         "--cap-lints allow",
+        "--target=arm-unknown-linux-musleabi"
     ],
     crate_features = [],
 )
@@ -35,10 +36,11 @@ rust_library(
     name = "x11_arm_unknown_linux_musleabi",
     crate_root = "src/lib.rs",
     srcs = glob(["lib.rs", "src/**/*.rs"]),
-    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc"],
+    deps = ["//complicated_cargo_library/vendor/libc-0.2.24:libc_arm_unknown_linux_musleabi"],
     rustc_flags = [
         "--cap-lints allow",
+        "--target=arm-unknown-linux-musleabi"
     ],
-    out_dir_tar = "x11_arm_unknown_linux_musleabi_build_script_executor",
+    out_dir_tar = ":x11_arm_unknown_linux_musleabi_build_script_executor",
     crate_features = [],
 )

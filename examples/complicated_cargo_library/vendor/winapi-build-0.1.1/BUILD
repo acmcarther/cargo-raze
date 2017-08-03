@@ -18,6 +18,7 @@ rust_library(
     deps = [],
     rustc_flags = [
         "--cap-lints allow",
+        "--target=arm-unknown-linux-musleabi"
     ],
     out_dir_tar = None,
     crate_features = [],

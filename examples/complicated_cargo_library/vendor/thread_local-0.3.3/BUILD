@@ -11,9 +11,10 @@ rust_library(
     name = "thread_local_arm_unknown_linux_musleabi",
     crate_root = "src/lib.rs",
     srcs = glob(["lib.rs", "src/**/*.rs"]),
-    deps = ["//complicated_cargo_library/vendor/thread-id-3.1.0:thread_id", "//complicated_cargo_library/vendor/unreachable-0.1.1:unreachable"],
+    deps = ["//complicated_cargo_library/vendor/thread-id-3.1.0:thread_id_arm_unknown_linux_musleabi", "//complicated_cargo_library/vendor/unreachable-0.1.1:unreachable_arm_unknown_linux_musleabi"],
     rustc_flags = [
         "--cap-lints allow",
+        "--target=arm-unknown-linux-musleabi"
     ],
     out_dir_tar = None,
     crate_features = [],

@@ -11,9 +11,10 @@ rust_binary(
     name = kernel32_sys_arm_unknown_linux_musleabi_build_script
     srcs = glob(["*", "src/**/*.rs"]),
     crate_root = "build.rs",
-    deps = ["//complicated_cargo_library/vendor/winapi-0.2.8:winapi", "//complicated_cargo_library/vendor/winapi-build-0.1.1:winapi_build"],
+    deps = ["//complicated_cargo_library/vendor/winapi-0.2.8:winapi_arm_unknown_linux_musleabi", "//complicated_cargo_library/vendor/winapi-build-0.1.1:winapi_build"],
     rustc_flags = [
         "--cap-lints allow",
+        "--target=arm-unknown-linux-musleabi"
     ],
     crate_features = [],
 )
@@ -39,10 +40,11 @@ rust_library(
     name = "kernel32_arm_unknown_linux_musleabi",
     crate_root = "src/lib.rs",
     srcs = glob(["lib.rs", "src/**/*.rs"]),
-    deps = ["//complicated_cargo_library/vendor/winapi-0.2.8:winapi"],
+    deps = ["//complicated_cargo_library/vendor/winapi-0.2.8:winapi_arm_unknown_linux_musleabi"],
     rustc_flags = [
         "--cap-lints allow",
+        "--target=arm-unknown-linux-musleabi"
     ],
-    out_dir_tar = "kernel32_sys_arm_unknown_linux_musleabi_build_script_executor",
+    out_dir_tar = ":kernel32_sys_arm_unknown_linux_musleabi_build_script_executor",
     crate_features = [],
 )

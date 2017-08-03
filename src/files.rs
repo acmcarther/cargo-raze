@@ -213,10 +213,11 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
       let mut out = Vec::new();
       for dep in pkg.dependencies.clone() {
         let sanitized_dependency_name = dep.name.to_owned().replace("-", "_");
-        out.push(format!("\"{workspace_prefix}/vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
+        out.push(format!("\"{workspace_prefix}/vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}_{platform_triple_sanitized}\"",
                 workspace_prefix = workspace_prefix,
                 dependency_name = dep.name,
                 dependency_version = dep.version,
+                platform_triple_sanitized = platform_triple_sanitized,
                 sanitized_dependency_name = sanitized_dependency_name));
       }
       out
@@ -246,6 +247,7 @@ r#"rust_binary(
     deps = [{deps}],
     rustc_flags = [
         "--cap-lints allow",
+        "--target={platform_triple}"
     ],
     crate_features = [{crate_features}],
 )"#,
@@ -253,7 +255,8 @@ r#"rust_binary(
           platform_triple_sanitized = platform_triple_sanitized,
           real_build_script_target_path = real_build_script_target.path,
           deps = build_deps_complete.join(", "),
-          crate_features = features_sorted.join(", "));
+          crate_features = features_sorted.join(", "),
+          platform_triple = platform_triple);
 
       let workspace_prefix_sans_initial_slashes = workspace_prefix.chars().skip(2).collect::<String>();
 
@@ -315,6 +318,7 @@ r#"rust_library(
     deps = [{deps}],
     rustc_flags = [
         "--cap-lints allow",
+        "--target={platform_triple}"
     ],
     out_dir_tar = {out_dir_tar},
     crate_features = [{crate_features}],
@@ -324,7 +328,8 @@ r#"rust_library(
           target_path = real_lib_target.path,
           crate_features = features_sorted.join(", "),
           deps = deps_sorted.join(", "),
-          out_dir_tar = out_dir_tar);
+          out_dir_tar = out_dir_tar,
+          platform_triple = platform_triple);
       build_rules.push(library_rule);
     }
 
