@@ -167,6 +167,7 @@ description = {expr}
 }
 
 pub fn generate_crate_build_file(pkg: &bazel::Package,
+                                 platform_triple: &str,
                                  workspace_prefix: &str) -> bazel::BuildFile {
     let path = format!("{}BUILD", &pkg.path);
     let prelude = format!(
@@ -179,21 +180,88 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 "#, workspace_prefix = workspace_prefix);
 
     let mut load_statements = HashSet::new();
-    load_statements.insert(r#"load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")"#.to_owned());
-    load_statements.insert(r#"load(":Crate.bzl", "description")"#.to_owned());
-    load_statements.insert(format!(r#"load("{workspace_prefix}:Cargo.bzl", "workspace")"#, workspace_prefix = workspace_prefix));
-    load_statements.insert(format!(r#"load("{workspace_prefix}:CargoOverrides.bzl", "override_cfg")"#, workspace_prefix = workspace_prefix));
+    load_statements.insert(r#"load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary", "rust_library")"#.to_owned());
+
+
+    let crate_name_sanitized = pkg.id.name().to_owned().replace("-", "_");
+    let mut build_script_target_path = None;
+    let mut lib_target_path = None;
+    for target in pkg.targets() {
+      if target.kinds.contains("lib") {
+        if lib_target.is_some() {
+          panic!("package {} had more than one 'lib' type target!", crate_name_sanitized)
+        }
+        lib_target_path = Some(target.path.to_owned())
+      }
+
+      if target.kinds.contains("custom-build") {
+        if lib_target.is_some() {
+          panic!("package {} had more than one 'custom-build' type target!", crate_name_sanitized)
+        }
+        build_script_target_path = Some(target.path.to_owned())
+      }
+
+      // TODO(acmcarther): Support other build types (plugins, binaries)
+    }
+
+    let platform_triple_sanitized = platform_triple.to_owned().replace("-", "_");
+    let mut build_rules = Vec::new();
+    let mut features_sorted = pkg.features.iter().cloned().collect::<Vec<_>>();
+    features_sorted.sort();
+    // TODO: get deps from space
+    let deps = ???
+
+    if let Some(real_build_script_target_path) = build_script_target_path {
+      let binary_rule = format!(
+r#"rust_binary(
+    name = {crate_name_sanitized}_{platform_triple_sanititized}_build_script
+    srcs = glob(["*", "src/**/*.rs"]),
+    crate_root = {real_build_script_target_path},
+    deps = {deps}
+    rustc_flags = [
+        "--cap-lints allow",
+    ],
+    crate_features = [{crate_features}]
+)"#, 
+          crate_name_sanitized = crate_name_sanitized,
+          platform_triple_sanitized = platform_triple_sanitized,
+          real_build_script_target_path = real_build_script_target_path,
+          deps = ???
+          crate_features = features_sorted.join(", "));
+
+      let workspace_prefix_sans_initial_slashes = workspace_prefix.chars().skip(2).collect::<String>();
+
+      let genrule_rule = format!(
+r#"genrule(
+    name = {crate_name_sanitized}_{platform_triple_sanititized}_build_script_executor
+    srcs = glob(["*", "src/**/*.rs"]),
+    outs = ["{crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs.tar.gz"],
+    tools = [":{crate_name_santized}_{platform_triple_sanitized}_build_script"],
+    cmd = "mkdir {crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs/;"
+        + " (export CARGO_MANIFEST_DIR=\"$$PWD/{workspace_prefix_sans_initial_slashes}vendor/{crate_name}-{crate_version}\";"
+        + " export TARGET='{platform_triple}';"
+        + " export RUST_BACKTRACE=1;"
+        + " export OUT_DIR=$$PWD/{crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs;"
+        + " export BINARY_PATH=\"$$PWD/$(location :{crate_name_sanitized}_{platform_triple_sanitized}_build_script)\";"
+        + " export OUT_TAR=$$PWD/$@;"
+        + " cd $$(dirname $(location :Cargo.toml)) && $$BINARY_PATH && tar -czf $$OUT_TAR -C $$OUT_DIR .)"
+)"#
+
+      build_rules.push(binary_rule);
+      build_rules.push(genrule_rule);
+    }
+
+    if let Some(real_lib_target_path) = lib_target_path {
+      let has_build_script = build_script_target_path.is_some()
+      build_rules.push(lib_rule);
+    }
 
     let build_rules = vec![format!(
 r#"
 cargo_library(
     srcs = glob(["lib.rs", "src/**/*.rs"]),
-    crate_bzl = description,
-    cargo_override_bzl = override_cfg,
-    platform = workspace.platform,
     workspace_path = "{workspace_prefix}/"
-)
-"#, workspace_prefix = workspace_prefix)];
+)"#, workspace_prefix = workspace_prefix)];
     bazel::BuildFile::new(path, prelude, load_statements, build_rules)
 }
 

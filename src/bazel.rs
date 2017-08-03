@@ -54,10 +54,12 @@ impl BuildFile {
   }
 
   pub fn write_self(self) -> Result<(), Box<CargoError>> {
+    let mut loads_sorted = self.load_statements.into_iter().collect::<Vec<_>>();
+    loads_sorted.sort();
     let final_contents = format!("{}\n{}\n{}",
                                  self.prelude,
-                                 self.load_statements.into_iter().collect::<Vec<_>>().join("\n"),
-                                 self.build_rules.join("\n\n"));
+                                 loads_sorted.join("\n"),
+                                 self.build_rules.join("\n"));
     let path = self.path.clone();
     try!(File::create(&path)
          .and_then(|mut f| f.write_all(final_contents.as_bytes()))

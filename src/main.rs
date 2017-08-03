@@ -125,7 +125,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
 
       for package in &raze_packages {
         //try!(files::generate_crate_bzl_file(&package));
-        build_files.push(files::generate_crate_build_file(&package, &workspace_prefix));
+        build_files.push(files::generate_crate_build_file(&package, &platform_triple, &workspace_prefix));
       }
     }
 
