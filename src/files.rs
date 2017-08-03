@@ -226,10 +226,11 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
       let mut out = Vec::new();
       for dep in pkg.build_dependencies.clone() {
         let sanitized_dependency_name = dep.name.to_owned().replace("-", "_");
-        out.push(format!("\"{workspace_prefix}/vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
+        out.push(format!("\"{workspace_prefix}/vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}_{platform_triple_sanitized}\"",
                 workspace_prefix = workspace_prefix,
                 dependency_name = dep.name,
                 dependency_version = dep.version,
+                platform_triple_sanitized = platform_triple_sanitized,
                 sanitized_dependency_name = sanitized_dependency_name));
       }
       out
