@@ -1,11 +1,70 @@
+use cargo::CargoError;
+use cargo::core::Package as CargoPackage;
+use cargo::core::PackageId;
+use cargo::util::Cfg as CargoCfg;
+use cargo::util::ChainError;
+use cargo::util::human;
 use files::BExpr;
 use files::ToBExpr;
-use cargo::util::Cfg as CargoCfg;
-use cargo::core::Package as CargoPackage;
 use std::collections::HashSet;
-use cargo::core::PackageId;
+use std::fs::File;
+use std::io::Write;
 
 static OVERRIDE_FILE_VERSION: &'static str = "1";
+
+pub struct BuildFile {
+  path: String,
+  prelude: String,
+  load_statements: HashSet<String>,
+  build_rules: Vec<String>,
+}
+
+impl BuildFile {
+  pub fn new(path: String,
+             prelude: String,
+             load_statements: HashSet<String>,
+             build_rules: Vec<String>) -> BuildFile {
+    BuildFile {
+      path: path,
+      prelude: prelude,
+      load_statements: load_statements,
+      build_rules: build_rules,
+    }
+  }
+
+  pub fn get_path(&self) -> &str {
+    &self.path
+  }
+
+  pub fn merge_with_file(&mut self, other_file: BuildFile) {
+    assert_eq!(self.path, other_file.path);
+    assert_eq!(self.prelude, other_file.prelude);
+
+    self.merge_with_contents(other_file.load_statements, other_file.build_rules);
+  }
+
+  pub fn merge_with_contents(&mut self,
+                    load_statements: HashSet<String>,
+                    mut build_rules: Vec<String>) {
+    for load_statement in load_statements.into_iter() {
+      self.load_statements.insert(load_statement);
+    }
+
+    self.build_rules.append(&mut build_rules);
+  }
+
+  pub fn write_self(self) -> Result<(), Box<CargoError>> {
+    let final_contents = format!("{}\n{}\n{}",
+                                 self.prelude,
+                                 self.load_statements.into_iter().collect::<Vec<_>>().join("\n"),
+                                 self.build_rules.join("\n\n"));
+    let path = self.path.clone();
+    try!(File::create(&path)
+         .and_then(|mut f| f.write_all(final_contents.as_bytes()))
+         .chain_error(|| human(format!("failed to create {}", &path))));
+    Ok(())
+  }
+}
 
 /** An object that can provide a useful example value, similar to Default */
 pub trait ExampleValue {

@@ -167,20 +167,25 @@ description = {expr}
 }
 
 pub fn generate_crate_build_file(pkg: &bazel::Package,
-                                 workspace_prefix: &str) -> Result<(), Box<CargoError>> {
-    let build_stub_contents = format!(
+                                 workspace_prefix: &str) -> bazel::BuildFile {
+    let path = format!("{}BUILD", &pkg.path);
+    let prelude = format!(
 r#""""
 cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
 package(default_visibility = ["{workspace_prefix}:__subpackages__"])
+"#, workspace_prefix = workspace_prefix);
 
-load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
-load(":Crate.bzl", "description")
-load("{workspace_prefix}:Cargo.bzl", "workspace")
-load("{workspace_prefix}:CargoOverrides.bzl", "override_cfg")
+    let mut load_statements = HashSet::new();
+    load_statements.insert(r#"load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")"#.to_owned());
+    load_statements.insert(r#"load(":Crate.bzl", "description")"#.to_owned());
+    load_statements.insert(format!(r#"load("{workspace_prefix}:Cargo.bzl", "workspace")"#, workspace_prefix = workspace_prefix));
+    load_statements.insert(format!(r#"load("{workspace_prefix}:CargoOverrides.bzl", "override_cfg")"#, workspace_prefix = workspace_prefix));
 
+    let build_rules = vec![format!(
+r#"
 cargo_library(
     srcs = glob(["lib.rs", "src/**/*.rs"]),
     crate_bzl = description,
@@ -188,13 +193,8 @@ cargo_library(
     platform = workspace.platform,
     workspace_path = "{workspace_prefix}/"
 )
-"#, workspace_prefix = workspace_prefix);
-    let build_stub_path = format!("{}BUILD", &pkg.path);
-    try!(File::create(&build_stub_path)
-         .and_then(|mut f| f.write_all(build_stub_contents.as_bytes()))
-         .chain_error(|| human(format!("failed to create {}", build_stub_path))));
-    println!("Generated {} successfully", build_stub_path);
-    Ok(())
+"#, workspace_prefix = workspace_prefix)];
+    bazel::BuildFile::new(path, prelude, load_statements, build_rules)
 }
 
 pub fn generate_vendor_build_file(raze_packages: &Vec<bazel::Package>,

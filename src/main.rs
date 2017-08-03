@@ -1,5 +1,6 @@
 extern crate cargo;
 extern crate rustc_serialize;
+extern crate itertools;
 
 #[macro_use]
 mod files;
@@ -20,6 +21,7 @@ use std::str::FromStr;
 use std::str;
 use planning::ResolvedPlan;
 use planning::PlannedDeps;
+use itertools::Itertools;
 
 #[derive(Debug, RustcDecodable)]
 struct Options {
@@ -84,53 +86,73 @@ fn real_main(options: Options, config: &Config) -> CliResult {
       })
       .collect::<Vec<_>>();
 
-    let mut raze_packages = Vec::new();
 
-    // TODO(acmcarther): Remove hack: This just generates the first triple
-    let (platform_triple, platform_attrs) = platform_triple_env_pairs.get(0).unwrap().clone();
+    let mut build_files = Vec::new();
+    for (platform_triple, platform_attrs) in platform_triple_env_pairs.into_iter() {
+      let mut raze_packages = Vec::new();
 
-    for id in try!(planning::find_all_package_ids(options.flag_host, &config, &resolve)) {
-        let package = packages.get(&id).unwrap().clone();
-        let features = resolve.features(&id).cloned().unwrap_or(HashSet::new());
-        let full_name = format!("{}-{}", id.name(), id.version());
-        let path = format!("./vendor/{}-{}/", id.name(), id.version());
+      // TODO:(acmcarther): Reduce duplicate work: the next 20 lines are copy paste per platform
+      for id in try!(planning::find_all_package_ids(options.flag_host.clone(), &config, &resolve)) {
+          let package = packages.get(&id).unwrap().clone();
+          let features = resolve.features(&id).cloned().unwrap_or(HashSet::new());
+          let full_name = format!("{}-{}", id.name(), id.version());
+          let path = format!("./vendor/{}-{}/", id.name(), id.version());
 
-        // Verify that package is really vendored
-        try!(fs::metadata(&path).chain_error(|| {
-            human(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
-        }));
+          // Verify that package is really vendored
+          try!(fs::metadata(&path).chain_error(|| {
+              human(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
+          }));
 
-        // Identify all possible dependencies
-        let PlannedDeps { build_deps, dev_deps, normal_deps } =
-            PlannedDeps::find_all_deps(&id, &package, &resolve, &platform_triple, &platform_attrs);
+          // Identify all possible dependencies
+          let PlannedDeps { build_deps, dev_deps, normal_deps } =
+              PlannedDeps::find_all_deps(&id, &package, &resolve, &platform_triple, &platform_attrs);
 
-        raze_packages.push(bazel::Package {
-            features: features,
-            is_root_dependency: root_direct_deps.contains(&id),
-            metadeps: Vec::new() /* TODO(acmcarther) */,
-            dependencies: normal_deps,
-            build_dependencies: build_deps,
-            dev_dependencies: dev_deps,
-            path: path,
-            targets: try!(planning::identify_targets(&full_name, &package)),
-            bazel_config: bazel::Config::default(),
-            id: id,
-            package: package,
-            full_name: full_name,
-        });
+          raze_packages.push(bazel::Package {
+              features: features,
+              is_root_dependency: root_direct_deps.contains(&id),
+              metadeps: Vec::new() /* TODO(acmcarther) */,
+              dependencies: normal_deps,
+              build_dependencies: build_deps,
+              dev_dependencies: dev_deps,
+              path: path,
+              targets: try!(planning::identify_targets(&full_name, &package)),
+              bazel_config: bazel::Config::default(),
+              id: id,
+              package: package,
+              full_name: full_name,
+          });
+      }
+
+      for package in &raze_packages {
+        //try!(files::generate_crate_bzl_file(&package));
+        build_files.push(files::generate_crate_build_file(&package, &workspace_prefix));
+      }
     }
 
-    for package in &raze_packages {
-      //try!(files::generate_crate_bzl_file(&package));
-      try!(files::generate_crate_build_file(&package, &workspace_prefix));
+    build_files.sort_by(|a, b| a.get_path().cmp(b.get_path()));
+    let unique_files = build_files
+      .into_iter()
+      .group_by(|a| a.get_path().to_owned())
+      .into_iter()
+      .map(|(_, mut fs)| {
+        let first = fs.next().unwrap();
+        fs.fold(first, |mut a, b| {
+          a.merge_with_file(b);
+          a
+        })
+      })
+      .collect::<Vec<_>>();
+
+    for file in unique_files {
+      try!(file.write_self())
     }
 
-    let workspace = bazel::Workspace::new(&raze_packages, &platform_triple, &platform_attrs);
+    //let workspace = bazel::Workspace::new(&raze_packages, &platform_triple, &platform_attrs);
 
     // TODO(acmcarther): Support this, somehow... Right now theres not an obvious choice for
     // platform
     //try!(files::generate_vendor_build_file(&raze_packages, &workspace_prefix));
-    try!(files::generate_workspace_bzl_file(&workspace));
+    //try!(files::generate_workspace_bzl_file(&workspace));
 
     // TODO(acmcarther): Remove, override is unsupported
     //try!(files::generate_override_bzl_file(false));
