@@ -5,15 +5,16 @@ DO NOT EDIT! Replaced on runs of cargo-raze
 """
 package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
 
-load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
-load(":Crate.bzl", "description")
-load("//complicated_cargo_library:Cargo.bzl", "workspace")
-load("//complicated_cargo_library:CargoOverrides.bzl", "override_cfg")
+load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
 
-cargo_library(
+rust_library(
+    name = "pkg_config_arm_unknown_linux_musleabi",
+    crate_root = "src/lib.rs",
     srcs = glob(["lib.rs", "src/**/*.rs"]),
-    crate_bzl = description,
-    cargo_override_bzl = override_cfg,
-    platform = workspace.platform,
-    workspace_path = "//complicated_cargo_library/"
+    deps = [],
+    rustc_flags = [
+        "--cap-lints allow",
+    ],
+    out_dir_tar = None,
+    crate_features = [],
 )
