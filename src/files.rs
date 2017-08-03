@@ -184,21 +184,21 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
 
 
     let crate_name_sanitized = pkg.id.name().to_owned().replace("-", "_");
-    let mut build_script_target_path = None;
-    let mut lib_target_path = None;
-    for target in pkg.targets() {
-      if target.kinds.contains("lib") {
+    let mut build_script_target = None;
+    let mut lib_target = None;
+    for target in pkg.targets.clone() {
+      if target.kinds.contains(&"lib".to_owned()) {
         if lib_target.is_some() {
           panic!("package {} had more than one 'lib' type target!", crate_name_sanitized)
         }
-        lib_target_path = Some(target.path.to_owned())
+        lib_target= Some(target.clone())
       }
 
-      if target.kinds.contains("custom-build") {
+      if target.kinds.contains(&"custom-build".to_owned()) {
         if lib_target.is_some() {
           panic!("package {} had more than one 'custom-build' type target!", crate_name_sanitized)
         }
-        build_script_target_path = Some(target.path.to_owned())
+        build_script_target = Some(target.clone())
       }
 
       // TODO(acmcarther): Support other build types (plugins, binaries)
@@ -208,35 +208,61 @@ package(default_visibility = ["{workspace_prefix}:__subpackages__"])
     let mut build_rules = Vec::new();
     let mut features_sorted = pkg.features.iter().cloned().collect::<Vec<_>>();
     features_sorted.sort();
-    // TODO: get deps from space
-    let deps = ???
+    // TODO: deduplicate "normal_deps" and "build_deps"
+    let normal_deps = {
+      let mut out = Vec::new();
+      for dep in pkg.dependencies.clone() {
+        let sanitized_dependency_name = dep.name.to_owned().replace("-", "_");
+        out.push(format!("\"{workspace_prefix}vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
+                workspace_prefix = workspace_prefix,
+                dependency_name = dep.name,
+                dependency_version = dep.version,
+                sanitized_dependency_name = sanitized_dependency_name));
+      }
+      out
+    };
+    let build_deps = {
+      let mut out = Vec::new();
+      for dep in pkg.build_dependencies.clone() {
+        let sanitized_dependency_name = dep.name.to_owned().replace("-", "_");
+        out.push(format!("\"{workspace_prefix}vendor/{dependency_name}-{dependency_version}:{sanitized_dependency_name}\"",
+                workspace_prefix = workspace_prefix,
+                dependency_name = dep.name,
+                dependency_version = dep.version,
+                sanitized_dependency_name = sanitized_dependency_name));
+      }
+      out
+    };
 
-    if let Some(real_build_script_target_path) = build_script_target_path {
+    if let Some(ref real_build_script_target) = build_script_target {
+
+      let mut build_deps_complete = build_deps.iter().chain(normal_deps.iter()).cloned().collect::<Vec<_>>();
+      build_deps_complete.sort();
       let binary_rule = format!(
 r#"rust_binary(
-    name = {crate_name_sanitized}_{platform_triple_sanititized}_build_script
+    name = {crate_name_sanitized}_{platform_triple_sanitized}_build_script
     srcs = glob(["*", "src/**/*.rs"]),
     crate_root = {real_build_script_target_path},
-    deps = {deps}
+    deps = [{deps}],
     rustc_flags = [
         "--cap-lints allow",
     ],
     crate_features = [{crate_features}]
-)"#, 
+)"#,
           crate_name_sanitized = crate_name_sanitized,
           platform_triple_sanitized = platform_triple_sanitized,
-          real_build_script_target_path = real_build_script_target_path,
-          deps = ???
+          real_build_script_target_path = real_build_script_target.path,
+          deps = build_deps_complete.join(", "),
           crate_features = features_sorted.join(", "));
 
       let workspace_prefix_sans_initial_slashes = workspace_prefix.chars().skip(2).collect::<String>();
 
       let genrule_rule = format!(
 r#"genrule(
-    name = {crate_name_sanitized}_{platform_triple_sanititized}_build_script_executor
+    name = {crate_name_sanitized}_{platform_triple_sanitized}_build_script_executor
     srcs = glob(["*", "src/**/*.rs"]),
     outs = ["{crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs.tar.gz"],
-    tools = [":{crate_name_santized}_{platform_triple_sanitized}_build_script"],
+    tools = [":{crate_name_sanitized}_{platform_triple_sanitized}_build_script"],
     cmd = "mkdir {crate_name_sanitized}_{platform_triple_sanitized}_out_dir_outputs/;"
         + " (export CARGO_MANIFEST_DIR=\"$$PWD/{workspace_prefix_sans_initial_slashes}vendor/{crate_name}-{crate_version}\";"
         + " export TARGET='{platform_triple}';"
@@ -245,23 +271,62 @@ r#"genrule(
         + " export BINARY_PATH=\"$$PWD/$(location :{crate_name_sanitized}_{platform_triple_sanitized}_build_script)\";"
         + " export OUT_TAR=$$PWD/$@;"
         + " cd $$(dirname $(location :Cargo.toml)) && $$BINARY_PATH && tar -czf $$OUT_TAR -C $$OUT_DIR .)"
-)"#
+)"#,
+          crate_name_sanitized = crate_name_sanitized,
+          crate_name = pkg.id.name().to_owned(),
+          crate_version = pkg.id.version().to_string(),
+          platform_triple_sanitized = platform_triple_sanitized,
+          workspace_prefix_sans_initial_slashes = workspace_prefix_sans_initial_slashes,
+          platform_triple = platform_triple);
 
       build_rules.push(binary_rule);
       build_rules.push(genrule_rule);
     }
 
-    if let Some(real_lib_target_path) = lib_target_path {
-      let has_build_script = build_script_target_path.is_some()
-      build_rules.push(lib_rule);
+    if let Some(real_lib_target) = lib_target {
+      let target_name_sanitized = real_lib_target.name.to_owned().replace("-", "_");
+      if target_name_sanitized != crate_name_sanitized {
+        let crate_name_alias_to_lib_rule = format!(
+r#"alias(
+    name = "{crate_name_sanitized}_{platform_triple_sanitized}",
+    actual = ":{target_name_sanitized}_{platform_triple_sanitized}",
+)"#, 
+           crate_name_sanitized = crate_name_sanitized,
+           platform_triple_sanitized = platform_triple_sanitized,
+           target_name_sanitized = target_name_sanitized);
+        build_rules.push(crate_name_alias_to_lib_rule);
+      }
+
+      let out_dir_tar = if build_script_target.is_some() {
+        format!("\"{crate_name_sanitized}_{platform_triple_sanitized}_build_script_executor\"",
+                crate_name_sanitized = crate_name_sanitized,
+                platform_triple_sanitized = platform_triple_sanitized)
+      } else {
+        "None".to_owned()
+      };
+
+      let mut deps_sorted = normal_deps.iter().cloned().collect::<Vec<_>>();
+      deps_sorted.sort();
+      let library_rule = format!(
+r#"rust_library(
+    name = "{target_name_sanitized}_{platform_triple_sanitized}",
+    crate_root = target_path,
+    srcs = glob(["lib.rs", "src/**/*.rs"]),
+    deps = [{deps}],
+    rustc_flags = [
+        "--cap-lints allow",
+    ],
+    out_dir_tar = {out_dir_tar}
+    crate_features = [{crate_features}]
+)"#,
+          target_name_sanitized = target_name_sanitized,
+          platform_triple_sanitized = platform_triple_sanitized,
+          crate_features = features_sorted.join(", "),
+          deps = deps_sorted.join(", "),
+          out_dir_tar = out_dir_tar);
+      build_rules.push(library_rule);
     }
 
-    let build_rules = vec![format!(
-r#"
-cargo_library(
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-    workspace_path = "{workspace_prefix}/"
-)"#, workspace_prefix = workspace_prefix)];
     bazel::BuildFile::new(path, prelude, load_statements, build_rules)
 }
 
