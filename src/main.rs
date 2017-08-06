@@ -1,11 +1,13 @@
 extern crate cargo;
 extern crate rustc_serialize;
 extern crate itertools;
+extern crate liquid;
 
 #[macro_use]
 mod files;
 mod bazel;
 mod planning;
+mod template_loader;
 
 use cargo::CargoError;
 use cargo::CliResult;

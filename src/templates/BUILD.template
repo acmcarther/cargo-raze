@@ -18,18 +18,22 @@ load(
 rust_binary(
     name = "{{ crate.name | replace '-', '_'  }}_build_script_{{platform.triple | replace '-', '_' }}",
     srcs = glob(["*", "src/**/*.rs"]),
-    crate_root = {% if crate.build_script.path %}"{{ crate.build_script.path }}"{% else %}"build.rs"{% endif %},
+    {%- if crate.build_script.path %}
+    crate_root = "{{ crate.build_script.path }}",
+    {%- else -%}
+    crate_root = "build.rs",
+    {%- endif %}
     {%- if crate.dependencies.size > 0 or crate.build_dependencies.size > 0 -%}
     deps = [
       {%- for dependency in crate.dependencies | concat: crate.build_dependencies | uniq | sort -%}
         "{{path_prefix}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace '-', '_' }}_{{platform.triple | replace '-', '_'}}",
       {%- endfor -%}
     ]
+    {% endif %}
     rustc_flags = [
         "--cap-lints allow",
         "--target={{platform.triple}}"
     ],
-    {% endif %}
     {%- if platform.features.size > 0 -%}
     crate_features = [
       {%- for feature in platform.features | sort -%}
@@ -84,15 +88,3 @@ rust_{{target.type}}(
 )
 {%- endfor -%}
 {%- endfor -%}
-
-rust_library(
-    name = "thread_id_i686_pc_windows_msvc",
-    crate_root = "src/lib.rs",
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-    deps = ["//hello_cargo_library/vendor/kernel32-sys-0.2.2:kernel32_sys"],
-    rustc_flags = [
-        "--cap-lints allow",
-    ],
-    out_dir_tar = None,
-    crate_features = [],
-)
