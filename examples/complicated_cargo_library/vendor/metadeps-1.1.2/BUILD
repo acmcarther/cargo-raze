@@ -19,8 +19,8 @@ rust_library(
     crate_root = "src/lib.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    "//complicated_cargo_library/vendor/pkg-config-0.3.9:pkg_config",
     "//complicated_cargo_library/vendor/toml-0.2.1:toml",
+    "//complicated_cargo_library/vendor/pkg-config-0.3.9:pkg_config",
     "//complicated_cargo_library/vendor/error-chain-0.10.0:error_chain",
     ],
     rustc_flags = [
@@ -38,8 +38,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":metadeps",
-    "//complicated_cargo_library/vendor/pkg-config-0.3.9:pkg_config",
     "//complicated_cargo_library/vendor/toml-0.2.1:toml",
+    "//complicated_cargo_library/vendor/pkg-config-0.3.9:pkg_config",
     "//complicated_cargo_library/vendor/error-chain-0.10.0:error_chain",
     
     ],

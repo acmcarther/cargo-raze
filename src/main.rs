@@ -12,25 +12,24 @@ extern crate lazy_static;
 mod bazel;
 mod planning;
 
-use tera::Context;
-use tera::Tera;
 use cargo::CargoError;
 use cargo::CliResult;
+use cargo::util::CargoResult;
 use cargo::util::Cfg;
-use cargo::util::ChainError;
 use cargo::util::Config;
-use cargo::util::human;
+use planning::PlannedDeps;
+use planning::ResolvedPlan;
 use std::collections::HashSet;
-use std::process::Command;
 use std::env;
+use std::fs::File;
 use std::fs;
 use std::io::Write;
-use std::fs::File;
+use std::ops::Deref;
+use std::process::Command;
 use std::str::FromStr;
 use std::str;
-use std::ops::Deref;
-use planning::ResolvedPlan;
-use planning::PlannedDeps;
+use tera::Context;
+use tera::Tera;
 
 lazy_static! {
     pub static ref TERA: Tera = {
@@ -77,9 +76,8 @@ fn main() {
     let args = env::args().collect::<Vec<_>>();
     let result = cargo::call_main_without_stdin(real_main, &config, USAGE, &args, false);
 
-    match result {
-        Err(e) => cargo::handle_cli_error(e, &mut *config.shell()),
-        Ok(()) => {},
+    if let Err(e) = result {
+        cargo::exit_with_error(e, &mut *config.shell());
     }
 }
 
@@ -97,7 +95,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
     let root_package_id = try!(resolve.iter()
         .filter(|dep| dep.name() == root_name)
         .next()
-        .ok_or(human("root crate should be in cargo resolve")));
+        .ok_or(CargoError::from("root crate should be in cargo resolve")));
     let root_direct_deps = resolve.deps(&root_package_id).cloned().collect::<HashSet<_>>();
 
     let targets_str = options.flag_targets.expect("--targets flag is mandatory: try 'x86_64-unknown-linux-gnu'");
@@ -118,13 +116,13 @@ fn real_main(options: Options, config: &Config) -> CliResult {
       // TODO:(acmcarther): Reduce duplicate work: the next 20 lines are copy paste per platform
       for id in try!(planning::find_all_package_ids(options.flag_host.clone(), &config, &resolve)) {
           let package = packages.get(&id).unwrap().clone();
-          let features = resolve.features(&id).cloned().unwrap_or(HashSet::new());
+          let features = resolve.features(&id).clone();
           let full_name = format!("{}-{}", id.name(), id.version());
           let path = format!("./vendor/{}-{}/", id.name(), id.version());
 
           // Verify that package is really vendored
-          try!(fs::metadata(&path).chain_error(|| {
-              human(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
+          try!(fs::metadata(&path).map_err(|_| {
+              CargoError::from(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
           }));
 
           // Identify all possible dependencies
@@ -161,7 +159,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         let build_stub_path = format!("{}BUILD", &package.path);
         try!(File::create(&build_stub_path)
              .and_then(|mut f| f.write_all(rendered_file.as_bytes()))
-             .chain_error(|| human(format!("failed to create {}", build_stub_path))));
+             .map_err(|_| CargoError::from(format!("failed to create {}", build_stub_path))));
         println!("Generated {} successfully", build_stub_path);
       }
     }
@@ -170,17 +168,17 @@ fn real_main(options: Options, config: &Config) -> CliResult {
 }
 
 /** Verifies that the provided workspace_prefix is present and makes sense. */
-fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> Result<String, Box<CargoError>> {
-    let workspace_prefix = try!(arg_buildprefix.ok_or(human(
+fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> CargoResult<String> {
+    let workspace_prefix = try!(arg_buildprefix.ok_or(CargoError::from(
         "build prefix must be specified (in the form //path/where/vendor/is)")));
 
     if workspace_prefix.ends_with("/vendor") {
-        return Err(human(
+        return Err(CargoError::from(
             format!("Bazel path \"{}\" should not end with /vendor, you probably want \"{}\"",
                     workspace_prefix, workspace_prefix.chars().take(workspace_prefix.chars().count() - 7).collect::<String>())));
     }
     if workspace_prefix.ends_with("/") {
-        return Err(human(
+        return Err(CargoError::from(
             format!("Bazel path \"{}\" should not end with /, you probably want \"{}\"",
                     workspace_prefix, workspace_prefix.chars().take(workspace_prefix.chars().count() - 1).collect::<String>())));
     }

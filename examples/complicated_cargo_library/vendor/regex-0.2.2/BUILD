@@ -19,8 +19,8 @@ rust_library(
     crate_root = "src/lib.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -40,8 +40,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -62,8 +62,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -84,8 +84,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -106,8 +106,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -128,8 +128,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -150,8 +150,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -172,8 +172,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -194,8 +194,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -216,8 +216,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -238,8 +238,8 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -260,8 +260,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -282,8 +282,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -304,8 +304,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -326,8 +326,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -348,8 +348,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -370,8 +370,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -392,8 +392,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
@@ -414,8 +414,8 @@ rust_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":regex",
-    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/utf8-ranges-1.0.0:utf8_ranges",
+    "//complicated_cargo_library/vendor/regex-syntax-0.4.1:regex_syntax",
     "//complicated_cargo_library/vendor/aho-corasick-0.6.3:aho_corasick",
     "//complicated_cargo_library/vendor/thread_local-0.3.3:thread_local",
     "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",

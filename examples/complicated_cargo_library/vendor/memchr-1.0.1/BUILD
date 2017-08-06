@@ -27,9 +27,9 @@ rust_library(
     ],
     
     crate_features = [
-      "use_std",
       "default",
       "libc",
+      "use_std",
     ],
 )
 rust_bench_test(
@@ -47,8 +47,8 @@ rust_bench_test(
     ],
     
     crate_features = [
-      "use_std",
       "default",
       "libc",
+      "use_std",
     ],
 )

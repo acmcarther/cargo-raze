@@ -11,11 +11,10 @@ use cargo::core::Workspace;
 use cargo::core::dependency::Kind;
 use cargo::ops::Packages;
 use cargo::ops;
+use cargo::util::CargoResult;
 use cargo::util::Cfg;
-use cargo::util::ChainError;
 use cargo::util::Config;
 use cargo::util::ToUrl;
-use cargo::util::human;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -79,14 +78,12 @@ impl<'a> ResolvedPlan<'a> {
      * Performs Cargo's own build plan resolution, yielding the root crate, the set of packages, and
      * the resolution graph.
      */
-    pub fn resolve_from_files(config: &Config) -> Result<ResolvedPlan, Box<CargoError>> {
+    pub fn resolve_from_files(config: &Config) -> CargoResult<ResolvedPlan> {
         let lockfile = Path::new("Cargo.lock");
         let manifest_path = lockfile.parent().unwrap().join("Cargo.toml");
         let manifest = env::current_dir().unwrap().join(&manifest_path);
         let ws = try!(Workspace::new(&manifest, config));
-        let specs = Packages::All.into_package_id_specs(&ws).chain_error(|| {
-          human("failed to fully parse package definitions")
-        })?;
+        let specs = Packages::All.into_package_id_specs(&ws)?;
         let root_name = specs.iter().next().unwrap().name().to_owned();
 
         let (packages, resolve) = ops::resolve_ws_precisely(
@@ -95,9 +92,7 @@ impl<'a> ResolvedPlan<'a> {
                 &[],
                 false,
                 false,
-                &specs).chain_error(|| {
-            human("failed to load pkg lockfile")
-        })?;
+                &specs)?;
         println!("{:?}", resolve);
 
         Ok(ResolvedPlan {
@@ -109,17 +104,17 @@ impl<'a> ResolvedPlan<'a> {
 }
 
 /** Derives bazel target objects from Cargo's target information. */
-pub fn identify_targets(full_name: &str, package: &CargoPackage) -> Result<Vec<bazel::Target>, Box<CargoError>> {
+pub fn identify_targets(full_name: &str, package: &CargoPackage) -> CargoResult<Vec<bazel::Target>> {
     let partial_path = format!("{}/", full_name);
     let partial_path_byte_length = partial_path.as_bytes().len();
     let mut targets = Vec::new();
 
     for target in package.targets().iter() {
         let target_path_str = try!(target.src_path().to_str()
-          .ok_or(human(format!("path for {}'s target {} wasn't unicode", &full_name, target.name()))))
+          .ok_or(CargoError::from(format!("path for {}'s target {} wasn't unicode", &full_name, target.name()))))
           .to_owned();
         let crate_name_str_idx = try!(target_path_str.find(&partial_path)
-          .ok_or(human(format!("path for {}'s target {} should have been in vendor directory", &full_name, target.name()))));
+          .ok_or(CargoError::from(format!("path for {}'s target {} should have been in vendor directory", &full_name, target.name()))));
         let local_path_bytes = target_path_str.bytes()
           .skip(crate_name_str_idx + partial_path_byte_length)
           .collect::<Vec<_>>();
@@ -137,13 +132,13 @@ pub fn identify_targets(full_name: &str, package: &CargoPackage) -> Result<Vec<b
 }
 
 /** Enumerates the set of all possibly relevant packages for the Cargo dependencies */
-pub fn find_all_package_ids(flag_host: Option<String>, config: &Config, resolve: &Resolve) -> Result<Vec<PackageId>, Box<CargoError>> {
+pub fn find_all_package_ids(flag_host: Option<String>, config: &Config, resolve: &Resolve) -> CargoResult<Vec<PackageId>> {
     let source_id_from_registry =
-      flag_host.map(|s| s.to_url().map(|url| SourceId::for_registry(&url)).map_err(human));
+      flag_host.map(|s| s.to_url().map(|url| SourceId::for_registry(&url)).map_err(CargoError::from));
 
     let registry_id = try!(source_id_from_registry.unwrap_or_else(|| SourceId::crates_io(config)));
-    try!(fs::metadata("Cargo.lock").chain_error(|| {
-      human("failed to find Cargo.lock. Please run `cargo generate-lockfile` first.")
+    try!(fs::metadata("Cargo.lock").map_err(|_| {
+      CargoError::from("failed to find Cargo.lock. Please run `cargo generate-lockfile` first.")
     }));
 
     let mut package_ids = resolve.iter()

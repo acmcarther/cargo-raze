@@ -27,7 +27,7 @@ rust_library(
     ],
     
     crate_features = [
-      "use_std",
       "default",
+      "use_std",
     ],
 )
