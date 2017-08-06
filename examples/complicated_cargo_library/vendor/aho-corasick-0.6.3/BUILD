@@ -5,15 +5,80 @@ DO NOT EDIT! Replaced on runs of cargo-raze
 """
 package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
 
-load("@io_bazel_rules_raze//raze:raze.bzl", "cargo_library")
-load(":Crate.bzl", "description")
-load("//complicated_cargo_library:Cargo.bzl", "workspace")
-load("//complicated_cargo_library:CargoOverrides.bzl", "override_cfg")
+load(
+    "@io_bazel_rules_rust//rust:rust.bzl",
+    "rust_library",
+    "rust_binary",
+    "rust_test",
+    "rust_bench_test",
+)
 
-cargo_library(
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-    crate_bzl = description,
-    cargo_override_bzl = override_cfg,
-    platform = workspace.platform,
-    workspace_path = "//complicated_cargo_library/"
+
+rust_library(
+    name = "aho_corasick",
+    crate_root = "src/lib.rs",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target=x86_64-unknown-linux-gnu",
+    ],
+    
+    crate_features = [
+      
+    ],
+)
+rust_binary(
+    name = "aho_corasick_dot",
+    crate_root = "src/main.rs",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target=x86_64-unknown-linux-gnu"
+    ],
+    
+    crate_features = [
+      
+    ],
+)
+rust_binary(
+    name = "dict_search",
+    crate_root = "examples/dict-search.rs",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    ":aho_corasick",
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
+    
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target=x86_64-unknown-linux-gnu"
+    ],
+    
+    crate_features = [
+      
+    ],
+)
+rust_bench_test(
+    name = "bench",
+    crate_root = "benches/bench.rs",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    ":aho_corasick",
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
+    
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target=x86_64-unknown-linux-gnu",
+    ],
+    
+    crate_features = [
+      
+    ],
 )

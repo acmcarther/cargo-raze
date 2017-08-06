@@ -1,12 +1,11 @@
 use bazel;
-
 use cargo::CargoError;
 use cargo::core::Dependency;
-use cargo::core::PackageId;
 use cargo::core::Package as CargoPackage;
+use cargo::core::PackageId;
 use cargo::core::PackageSet;
-use cargo::core::SourceId;
 use cargo::core::Resolve;
+use cargo::core::SourceId;
 use cargo::core::TargetKind;
 use cargo::core::Workspace;
 use cargo::core::dependency::Kind;
@@ -51,6 +50,11 @@ impl PlannedDeps {
                 version: dep.version().to_string(),
             })
             .collect::<Vec<bazel::Dependency>>();
+        let _debug_dev_deps = resolved_deps.iter().filter(|d| dev_deps.contains(&d.name)).cloned().collect::<Vec<_>>();
+        println!("{:?}: PlatformDeps: {:?}", id.name(), platform_deps);
+        println!("{:?}: DevDeps: {:?}", id.name(), dev_deps);
+        println!("{:?}: ResolvedDeps: {:?}", id.name(), resolved_deps.iter().map(|d| d.name.clone()).collect::<Vec<_>>());
+        println!("{:?}: DebugOutputDevDeps: {:?}", id.name(), _debug_dev_deps);
 
         PlannedDeps {
            normal_deps:
@@ -94,6 +98,7 @@ impl<'a> ResolvedPlan<'a> {
                 &specs).chain_error(|| {
             human("failed to load pkg lockfile")
         })?;
+        println!("{:?}", resolve);
 
         Ok(ResolvedPlan {
           root_name: root_name,
@@ -119,12 +124,13 @@ pub fn identify_targets(full_name: &str, package: &CargoPackage) -> Result<Vec<b
           .skip(crate_name_str_idx + partial_path_byte_length)
           .collect::<Vec<_>>();
         let local_path_str = String::from_utf8(local_path_bytes).unwrap();
-
-        targets.push(bazel::Target {
-          name: target.name().to_owned(),
-          path: local_path_str,
-          kinds: kind_to_kinds(target.kind()),
-        });
+        for kind in kind_to_kinds(target.kind()) {
+          targets.push(bazel::Target {
+            name: target.name().to_owned(),
+            path: local_path_str.clone(),
+            kind: kind,
+          });
+        }
     }
 
     Ok(targets)

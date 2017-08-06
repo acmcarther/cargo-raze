@@ -1,4 +1,3 @@
-
 """
 cargo-raze crate build file.
 
@@ -8,83 +7,27 @@ package(default_visibility = ["{{path_prefix}}:__subpackages__"])
 
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
-    {% for target in crate.targets %}
-    "rust_{{target.type}}",
-    {% endfor %}
+    "rust_library",
+    "rust_binary",
+    "rust_test",
+    "rust_bench_test",
 )
-{%- for platform in platforms -%}
-{%- if crate.build_script -%}
-
-rust_binary(
-    name = "{{ crate.name | replace '-', '_'  }}_build_script_{{platform.triple | replace '-', '_' }}",
-    srcs = glob(["*", "src/**/*.rs"]),
-    {%- if crate.build_script.path %}
-    crate_root = "{{ crate.build_script.path }}",
-    {%- else -%}
-    crate_root = "build.rs",
-    {%- endif %}
-    {%- if crate.dependencies.size > 0 or crate.build_dependencies.size > 0 -%}
-    deps = [
-      {%- for dependency in crate.dependencies | concat: crate.build_dependencies | uniq | sort -%}
-        "{{path_prefix}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace '-', '_' }}_{{platform.triple | replace '-', '_'}}",
-      {%- endfor -%}
-    ]
-    {% endif %}
-    rustc_flags = [
-        "--cap-lints allow",
-        "--target={{platform.triple}}"
-    ],
-    {%- if platform.features.size > 0 -%}
-    crate_features = [
-      {%- for feature in platform.features | sort -%}
-      "{{feature}}",
-      {%- endfor -%}
-    ],
-    {%- endif -%}
-    visibility = ["//visibility:private"],
-)
-
-genrule(
-    name = "{{ crate.name | replace '-', '_'  }}_build_script_executor_{{ platform.triple | replace '-', '_' }}",
-    srcs = glob(["*", "src/**/*.rs"]),
-    outs = ["{{ crate.name | replace '-', '_'  }}_{{platform.triple | replace '-', '_' }}_out_dir_outputs.tar.gz"],
-    tools = [":{{ crate.name | replace '-', '_'  }}_build_script_{{platform.triple | replace '-', '_' }}"],
-    cmd = "mkdir {{ crate_name | replace '-', '_'}}_out_dir_outputs_{{ platform.triple | replace '-', '_' }}/;"
-        + " (export CARGO_MANIFEST_DIR=\"$$PWD{{ path_prefix | remove_first: '/' }}/vendor/{{ crate.name }}-{{ crate.version }}\";"
-        + " export TARGET='{{ platform.triple }}';"
-        + " export RUST_BACKTRACE=1;"
-        + " export OUT_DIR=$$PWD/{{ crate.name | replace '-', '_' }}_out_dir_outputs_{{ platform.triple | replace '-', '_' }};"
-        + " export BINARY_PATH=\"$$PWD/$(location :{{ crate.name | replace '-', '_' }}_build_script_{{ platform.triple | replace '-', '_' }})\";"
-        + " export OUT_TAR=$$PWD/$@;"
-        + " cd $$(dirname $(location :Cargo.toml)) && $$BINARY_PATH && tar -czf $$OUT_TAR -C $$OUT_DIR .)"
-)
-{%- endif -%}
-{%- for target in crate.targets -%}
-
-rust_{{target.type}}(
-    name = "{{ crate.name | replace '-', '_'  }}_{{platform.triple | replace '-', '_' }}",
-    crate_root = "{{ target.root_path }}",
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
-    {%- if crate.dependencies.size > 0 -%}
-    deps = [
-    {%- for dependency in crate.dependencies | sort -%}
-        "{{path_prefix}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace '-', '_' }}_{{platform.triple | replace '-', '_'}}",
-    {%- endfor -%}
-    ],
-    {% endif %}
-    rustc_flags = [
-        "--cap-lints allow",
-        "--target={{platform.triple}}"
-    ],
-    artifact_name = "{{crate.name}}"
-    {% if crate.build_script %}
-    out_dir_tar = ":{{ crate.name }}_build_script_executor_{{platform.triple}}",
-    {% endif %}
-    crate_features = [
-      {%- for feature in platform.features | sort -%}
-      "{{feature}}",
-      {%- endfor -%}
-    ],
-)
-{%- endfor -%}
-{%- endfor -%}
+{% set crate_name_sanitized = crate.pkg_name | replace(from="-", to="_") %}
+{% if crate.build_script %}
+{% include "templates/partials/build_script.template" %}
+{% endif %}
+{% for target in crate.targets %}
+{% if target.kind == "lib" %}
+{% include "templates/partials/rust_library.template" %}
+{% elif target.kind == "bin" %}
+{% include "templates/partials/rust_binary.template" %}
+{% elif target.kind == "test" %}
+{% include "templates/partials/rust_test.template" %}
+{% elif target.kind == "bench" %}
+{% include "templates/partials/rust_bench_test.template" %}
+{% elif target.kind == "example" %}
+{% include "templates/partials/rust_example.template" %}
+{% else %}
+# Unsupported target "{{ target.name }}" with type "{{ target.kind }}" omitted
+{% endif %}
+{% endfor %}

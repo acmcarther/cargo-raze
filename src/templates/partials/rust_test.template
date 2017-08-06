@@ -1,0 +1,28 @@
+{% set target_name_sanitized = target.name | replace(from="-", to="_") %}
+
+rust_test(
+    name = "{{ target_name_sanitized }}",
+    crate_root = "{{ target.path }}",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    ":{{crate_name_sanitized}}",
+    {% for dependency in crate.dependencies %}
+        "{{path_prefix}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace(from="-", to="_") }}",
+    {% endfor %}
+    {% for dependency in crate.dev_dependencies %}
+        "{{path_prefix}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace(from="-", to="_") }}",
+    {% endfor %}
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target={{crate.platform_triple}}",
+    ],
+    {% if crate.build_script %}
+    out_dir_tar = ":{{ crate.pkg_name }}_build_script_executor",
+    {% endif %}
+    crate_features = [
+      {% for feature in crate.features %}
+      "{{feature}}",
+      {% endfor %}
+    ],
+)

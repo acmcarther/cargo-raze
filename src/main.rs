@@ -1,14 +1,19 @@
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
 extern crate cargo;
 extern crate rustc_serialize;
 extern crate itertools;
-extern crate liquid;
+extern crate tera;
+#[macro_use]
+extern crate lazy_static;
 
 #[macro_use]
-mod files;
 mod bazel;
 mod planning;
-mod template_loader;
 
+use tera::Context;
+use tera::Tera;
 use cargo::CargoError;
 use cargo::CliResult;
 use cargo::util::Cfg;
@@ -19,11 +24,28 @@ use std::collections::HashSet;
 use std::process::Command;
 use std::env;
 use std::fs;
+use std::io::Write;
+use std::fs::File;
 use std::str::FromStr;
 use std::str;
+use std::ops::Deref;
 use planning::ResolvedPlan;
 use planning::PlannedDeps;
-use itertools::Itertools;
+
+lazy_static! {
+    pub static ref TERA: Tera = {
+      let mut tera = Tera::new("src/not/a/dir/*").unwrap();
+      tera.add_raw_templates(vec![
+        ("templates/partials/rust_binary.template", include_str!("templates/partials/rust_binary.template")),
+        ("templates/partials/rust_library.template", include_str!("templates/partials/rust_library.template")),
+        ("templates/partials/rust_test.template", include_str!("templates/partials/rust_test.template")),
+        ("templates/partials/rust_bench_test.template", include_str!("templates/partials/rust_bench_test.template")),
+        ("templates/partials/rust_example.template", include_str!("templates/partials/rust_example.template")),
+        ("templates/partials/build_script.template", include_str!("templates/partials/build_script.template")),
+        ("templates/BUILD.template", include_str!("templates/BUILD.template"))]).unwrap();
+      tera
+    };
+}
 
 #[derive(Debug, RustcDecodable)]
 struct Options {
@@ -78,7 +100,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
         .ok_or(human("root crate should be in cargo resolve")));
     let root_direct_deps = resolve.deps(&root_package_id).cloned().collect::<HashSet<_>>();
 
-    let targets_str = options.flag_targets.expect("--targets flag is mandatory");
+    let targets_str = options.flag_targets.expect("--targets flag is mandatory: try 'x86_64-unknown-linux-gnu'");
     let platform_triple_env_pairs = targets_str
       .split(',')
       .map(|triple| {
@@ -89,9 +111,9 @@ fn real_main(options: Options, config: &Config) -> CliResult {
       .collect::<Vec<_>>();
 
 
-    let mut build_files = Vec::new();
+    //let mut build_files = Vec::new();
     for (platform_triple, platform_attrs) in platform_triple_env_pairs.into_iter() {
-      let mut raze_packages = Vec::new();
+      let mut crate_contexts = Vec::new();
 
       // TODO:(acmcarther): Reduce duplicate work: the next 20 lines are copy paste per platform
       for id in try!(planning::find_all_package_ids(options.flag_host.clone(), &config, &resolve)) {
@@ -109,7 +131,12 @@ fn real_main(options: Options, config: &Config) -> CliResult {
           let PlannedDeps { build_deps, dev_deps, normal_deps } =
               PlannedDeps::find_all_deps(&id, &package, &resolve, &platform_triple, &platform_attrs);
 
-          raze_packages.push(bazel::Package {
+          let targets = try!(planning::identify_targets(&full_name, &package));
+          let build_script_target = targets.iter().find(|t| t.kind.deref() == "custom-build").cloned();
+
+          crate_contexts.push(bazel::CrateContext {
+              pkg_name: id.name().to_owned(),
+              pkg_version: id.version().to_string(),
               features: features,
               is_root_dependency: root_direct_deps.contains(&id),
               metadeps: Vec::new() /* TODO(acmcarther) */,
@@ -117,48 +144,27 @@ fn real_main(options: Options, config: &Config) -> CliResult {
               build_dependencies: build_deps,
               dev_dependencies: dev_deps,
               path: path,
-              targets: try!(planning::identify_targets(&full_name, &package)),
+              build_script_target: build_script_target,
+              targets: targets,
               bazel_config: bazel::Config::default(),
-              id: id,
-              package: package,
-              full_name: full_name,
+              platform_triple: platform_triple.to_owned(),
           });
       }
 
-      for package in &raze_packages {
-        //try!(files::generate_crate_bzl_file(&package));
-        build_files.push(files::generate_crate_build_file(&package, &platform_triple, &workspace_prefix));
+      for package in &crate_contexts {
+        //let crate_context = package.to_crate_context();
+        let mut context = Context::new();
+        context.add("crate", &package);
+        context.add("path_prefix", &workspace_prefix);
+        let rendered_file = TERA.render("templates/BUILD.template", &context).unwrap();
+
+        let build_stub_path = format!("{}BUILD", &package.path);
+        try!(File::create(&build_stub_path)
+             .and_then(|mut f| f.write_all(rendered_file.as_bytes()))
+             .chain_error(|| human(format!("failed to create {}", build_stub_path))));
+        println!("Generated {} successfully", build_stub_path);
       }
     }
-
-    build_files.sort_by(|a, b| a.get_path().cmp(b.get_path()));
-    let unique_files = build_files
-      .into_iter()
-      .group_by(|a| a.get_path().to_owned())
-      .into_iter()
-      .map(|(_, mut fs)| {
-        let first = fs.next().unwrap();
-        fs.fold(first, |mut a, b| {
-          a.merge_with_file(b);
-          a
-        })
-      })
-      .collect::<Vec<_>>();
-
-    for file in unique_files {
-      try!(file.write_self())
-    }
-
-    //let workspace = bazel::Workspace::new(&raze_packages, &platform_triple, &platform_attrs);
-
-    // TODO(acmcarther): Support this, somehow... Right now theres not an obvious choice for
-    // platform
-    //try!(files::generate_vendor_build_file(&raze_packages, &workspace_prefix));
-    //try!(files::generate_workspace_bzl_file(&workspace));
-
-    // TODO(acmcarther): Remove, override is unsupported
-    //try!(files::generate_override_bzl_file(false));
-    //try!(files::generate_outer_build_file());
 
     Ok(())
 }
