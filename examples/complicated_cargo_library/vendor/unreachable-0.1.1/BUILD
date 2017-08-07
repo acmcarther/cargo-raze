@@ -3,7 +3,7 @@ cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
-package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
+package(default_visibility = ["//hello_cargo_library:__subpackages__"])
 
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
@@ -19,7 +19,7 @@ rust_library(
     crate_root = "src/lib.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    "//complicated_cargo_library/vendor/void-1.0.2:void",
+    "//hello_cargo_library/vendor/void-1.0.2:void",
     ],
     rustc_flags = [
         "--cap-lints allow",

@@ -3,7 +3,7 @@ cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
-package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
+package(default_visibility = ["//hello_cargo_library:__subpackages__"])
 
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",

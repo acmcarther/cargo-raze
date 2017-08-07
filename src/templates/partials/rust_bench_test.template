@@ -1,5 +1,7 @@
 {% set target_name_sanitized = target.name | replace(from="-", to="_") %}
 
+# NOTE: Benchmark may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
 rust_bench_test(
     name = "{{ target_name_sanitized }}",
     crate_root = "{{ target.path }}",
@@ -25,4 +27,5 @@ rust_bench_test(
       "{{feature}}",
       {% endfor %}
     ],
+    visibility = ["//visibility:private"],
 )

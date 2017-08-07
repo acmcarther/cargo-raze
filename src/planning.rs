@@ -50,10 +50,6 @@ impl PlannedDeps {
             })
             .collect::<Vec<bazel::Dependency>>();
         let _debug_dev_deps = resolved_deps.iter().filter(|d| dev_deps.contains(&d.name)).cloned().collect::<Vec<_>>();
-        println!("{:?}: PlatformDeps: {:?}", id.name(), platform_deps);
-        println!("{:?}: DevDeps: {:?}", id.name(), dev_deps);
-        println!("{:?}: ResolvedDeps: {:?}", id.name(), resolved_deps.iter().map(|d| d.name.clone()).collect::<Vec<_>>());
-        println!("{:?}: DebugOutputDevDeps: {:?}", id.name(), _debug_dev_deps);
 
         PlannedDeps {
            normal_deps:
@@ -93,7 +89,6 @@ impl<'a> ResolvedPlan<'a> {
                 false,
                 false,
                 &specs)?;
-        println!("{:?}", resolve);
 
         Ok(ResolvedPlan {
           root_name: root_name,

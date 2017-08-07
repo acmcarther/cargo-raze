@@ -3,7 +3,7 @@ cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
-package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
+package(default_visibility = ["//hello_cargo_library:__subpackages__"])
 
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
@@ -14,11 +14,15 @@ load(
 )
 
 
-rust_library(
-    name = "utf8_ranges",
-    crate_root = "src/lib.rs",
+# NOTE: Benchmark may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
+rust_bench_test(
+    name = "bench",
+    crate_root = "benches/bench.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
+    ":utf8_ranges",
+    
     
     ],
     rustc_flags = [
@@ -29,14 +33,13 @@ rust_library(
     crate_features = [
       
     ],
+    visibility = ["//visibility:private"],
 )
-rust_bench_test(
-    name = "bench",
-    crate_root = "benches/bench.rs",
+rust_library(
+    name = "utf8_ranges",
+    crate_root = "src/lib.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    ":utf8_ranges",
-    
     
     ],
     rustc_flags = [

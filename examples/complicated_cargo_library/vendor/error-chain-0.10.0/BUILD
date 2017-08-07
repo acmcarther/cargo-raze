@@ -3,7 +3,7 @@ cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
-package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
+package(default_visibility = ["//hello_cargo_library:__subpackages__"])
 
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
@@ -14,58 +14,8 @@ load(
 )
 
 
-rust_library(
-    name = "error_chain",
-    crate_root = "src/lib.rs",
-    srcs = glob(["**/*.rs"]),
-    deps = [
-    
-    ],
-    rustc_flags = [
-        "--cap-lints allow",
-        "--target=x86_64-unknown-linux-gnu",
-    ],
-    
-    crate_features = [
-      
-    ],
-)
-rust_binary(
-    name = "quickstart",
-    crate_root = "examples/quickstart.rs",
-    srcs = glob(["**/*.rs"]),
-    deps = [
-    ":error_chain",
-    
-    
-    ],
-    rustc_flags = [
-        "--cap-lints allow",
-        "--target=x86_64-unknown-linux-gnu"
-    ],
-    
-    crate_features = [
-      
-    ],
-)
-rust_binary(
-    name = "doc",
-    crate_root = "examples/doc.rs",
-    srcs = glob(["**/*.rs"]),
-    deps = [
-    ":error_chain",
-    
-    
-    ],
-    rustc_flags = [
-        "--cap-lints allow",
-        "--target=x86_64-unknown-linux-gnu"
-    ],
-    
-    crate_features = [
-      
-    ],
-)
+# NOTE: Example may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
 rust_binary(
     name = "all",
     crate_root = "examples/all.rs",
@@ -83,10 +33,13 @@ rust_binary(
     crate_features = [
       
     ],
+    visibility = ["//visibility:private"],
 )
+# NOTE: Example may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
 rust_binary(
-    name = "size",
-    crate_root = "examples/size.rs",
+    name = "doc",
+    crate_root = "examples/doc.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
     ":error_chain",
@@ -101,14 +54,13 @@ rust_binary(
     crate_features = [
       
     ],
+    visibility = ["//visibility:private"],
 )
-rust_test(
-    name = "tests",
-    crate_root = "tests/tests.rs",
+rust_library(
+    name = "error_chain",
+    crate_root = "src/lib.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    ":error_chain",
-    
     
     ],
     rustc_flags = [
@@ -120,6 +72,8 @@ rust_test(
       
     ],
 )
+# NOTE: Test may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
 rust_test(
     name = "quick_main",
     crate_root = "tests/quick_main.rs",
@@ -137,4 +91,68 @@ rust_test(
     crate_features = [
       
     ],
+    visibility = ["//visibility:private"],
+)
+# NOTE: Example may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
+rust_binary(
+    name = "quickstart",
+    crate_root = "examples/quickstart.rs",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    ":error_chain",
+    
+    
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target=x86_64-unknown-linux-gnu"
+    ],
+    
+    crate_features = [
+      
+    ],
+    visibility = ["//visibility:private"],
+)
+# NOTE: Example may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
+rust_binary(
+    name = "size",
+    crate_root = "examples/size.rs",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    ":error_chain",
+    
+    
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target=x86_64-unknown-linux-gnu"
+    ],
+    
+    crate_features = [
+      
+    ],
+    visibility = ["//visibility:private"],
+)
+# NOTE: Test may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
+rust_test(
+    name = "tests",
+    crate_root = "tests/tests.rs",
+    srcs = glob(["**/*.rs"]),
+    deps = [
+    ":error_chain",
+    
+    
+    ],
+    rustc_flags = [
+        "--cap-lints allow",
+        "--target=x86_64-unknown-linux-gnu",
+    ],
+    
+    crate_features = [
+      
+    ],
+    visibility = ["//visibility:private"],
 )

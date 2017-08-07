@@ -33,6 +33,7 @@ use tera::Tera;
 
 lazy_static! {
     pub static ref TERA: Tera = {
+      // Configure tera with a bogus template dir: We don't want any runtime template support
       let mut tera = Tera::new("src/not/a/dir/*").unwrap();
       tera.add_raw_templates(vec![
         ("templates/partials/rust_binary.template", include_str!("templates/partials/rust_binary.template")),
@@ -41,7 +42,8 @@ lazy_static! {
         ("templates/partials/rust_bench_test.template", include_str!("templates/partials/rust_bench_test.template")),
         ("templates/partials/rust_example.template", include_str!("templates/partials/rust_example.template")),
         ("templates/partials/build_script.template", include_str!("templates/partials/build_script.template")),
-        ("templates/BUILD.template", include_str!("templates/BUILD.template"))]).unwrap();
+        ("templates/workspace.BUILD.template", include_str!("templates/workspace.BUILD.template")),
+        ("templates/crate.BUILD.template", include_str!("templates/crate.BUILD.template"))]).unwrap();
       tera
     };
 }
@@ -109,60 +111,80 @@ fn real_main(options: Options, config: &Config) -> CliResult {
       .collect::<Vec<_>>();
 
 
-    //let mut build_files = Vec::new();
-    for (platform_triple, platform_attrs) in platform_triple_env_pairs.into_iter() {
-      let mut crate_contexts = Vec::new();
-
-      // TODO:(acmcarther): Reduce duplicate work: the next 20 lines are copy paste per platform
-      for id in try!(planning::find_all_package_ids(options.flag_host.clone(), &config, &resolve)) {
-          let package = packages.get(&id).unwrap().clone();
-          let features = resolve.features(&id).clone();
-          let full_name = format!("{}-{}", id.name(), id.version());
-          let path = format!("./vendor/{}-{}/", id.name(), id.version());
-
-          // Verify that package is really vendored
-          try!(fs::metadata(&path).map_err(|_| {
-              CargoError::from(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
-          }));
-
-          // Identify all possible dependencies
-          let PlannedDeps { build_deps, dev_deps, normal_deps } =
-              PlannedDeps::find_all_deps(&id, &package, &resolve, &platform_triple, &platform_attrs);
-
-          let targets = try!(planning::identify_targets(&full_name, &package));
-          let build_script_target = targets.iter().find(|t| t.kind.deref() == "custom-build").cloned();
-
-          crate_contexts.push(bazel::CrateContext {
-              pkg_name: id.name().to_owned(),
-              pkg_version: id.version().to_string(),
-              features: features,
-              is_root_dependency: root_direct_deps.contains(&id),
-              metadeps: Vec::new() /* TODO(acmcarther) */,
-              dependencies: normal_deps,
-              build_dependencies: build_deps,
-              dev_dependencies: dev_deps,
-              path: path,
-              build_script_target: build_script_target,
-              targets: targets,
-              bazel_config: bazel::Config::default(),
-              platform_triple: platform_triple.to_owned(),
-          });
-      }
-
-      for package in &crate_contexts {
-        //let crate_context = package.to_crate_context();
-        let mut context = Context::new();
-        context.add("crate", &package);
-        context.add("path_prefix", &workspace_prefix);
-        let rendered_file = TERA.render("templates/BUILD.template", &context).unwrap();
-
-        let build_stub_path = format!("{}BUILD", &package.path);
-        try!(File::create(&build_stub_path)
-             .and_then(|mut f| f.write_all(rendered_file.as_bytes()))
-             .map_err(|_| CargoError::from(format!("failed to create {}", build_stub_path))));
-        println!("Generated {} successfully", build_stub_path);
-      }
+    let mut crate_contexts = Vec::new();
+    let platform_count = platform_triple_env_pairs.len();
+    let (platform_triple, platform_attrs) = platform_triple_env_pairs.get(0).cloned().unwrap();
+    if platform_count > 1 {
+      println!("WARNING: currently only a single target platform is supported.");
+      println!("Using target {}", platform_triple);
     }
+
+    // TODO:(acmcarther): Reduce duplicate work: the next 20 lines are copy paste per platform
+    for id in try!(planning::find_all_package_ids(options.flag_host.clone(), &config, &resolve)) {
+        let package = packages.get(&id).unwrap().clone();
+        let mut features = resolve.features(&id).clone().into_iter().collect::<Vec<_>>();
+        features.sort();
+        let full_name = format!("{}-{}", id.name(), id.version());
+        let path = format!("./vendor/{}-{}/", id.name(), id.version());
+
+        // Verify that package is really vendored
+        try!(fs::metadata(&path).map_err(|_| {
+            CargoError::from(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
+        }));
+
+        // Identify all possible dependencies
+        let PlannedDeps { mut build_deps, mut dev_deps, mut normal_deps } =
+            PlannedDeps::find_all_deps(&id, &package, &resolve, &platform_triple, &platform_attrs);
+        build_deps.sort();
+        dev_deps.sort();
+        normal_deps.sort();
+
+        let mut targets = try!(planning::identify_targets(&full_name, &package));
+        targets.sort();
+        let build_script_target = targets.iter().find(|t| t.kind.deref() == "custom-build").cloned();
+        let targets_sans_build_script = 
+          targets.into_iter().filter(|t| t.kind.deref() != "custom-build").collect::<Vec<_>>();
+
+        crate_contexts.push(bazel::CrateContext {
+            pkg_name: id.name().to_owned(),
+            pkg_version: id.version().to_string(),
+            features: features,
+            is_root_dependency: root_direct_deps.contains(&id),
+            metadeps: Vec::new() /* TODO(acmcarther) */,
+            dependencies: normal_deps,
+            build_dependencies: build_deps,
+            dev_dependencies: dev_deps,
+            path: path,
+            build_script_target: build_script_target,
+            targets: targets_sans_build_script,
+            bazel_config: bazel::Config::default(),
+            platform_triple: platform_triple.to_owned(),
+        });
+    }
+
+    for package in &crate_contexts {
+      //let crate_context = package.to_crate_context();
+      let mut context = Context::new();
+      context.add("crate", &package);
+      context.add("path_prefix", &workspace_prefix);
+      let rendered_crate_build_file = TERA.render("templates/crate.BUILD.template", &context).unwrap();
+
+      let build_file_path = format!("{}BUILD", &package.path);
+      try!(File::create(&build_file_path)
+           .and_then(|mut f| f.write_all(rendered_crate_build_file.as_bytes()))
+           .map_err(|_| CargoError::from(format!("failed to create {}", build_file_path))));
+      println!("Generated {} successfully", build_file_path);
+    }
+
+    let mut context = Context::new();
+    context.add("path_prefix", &workspace_prefix);
+    context.add("crates", &crate_contexts);
+    let rendered_alias_build_file = TERA.render("templates/workspace.BUILD.template", &context).unwrap();
+    let build_file_path = "vendor/BUILD";
+    try!(File::create(&build_file_path)
+         .and_then(|mut f| f.write_all(rendered_alias_build_file.as_bytes()))
+         .map_err(|_| CargoError::from(format!("failed to create {}", build_file_path))));
+    println!("Generated {} successfully", build_file_path);
 
     Ok(())
 }

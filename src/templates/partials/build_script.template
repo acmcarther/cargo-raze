@@ -1,8 +1,8 @@
 rust_binary(
     name = "{{ crate_name_sanitized }}_build_script",
     srcs = glob(["*", "**/*.rs"]),
-    {% if crate.build_script.path %}
-    crate_root = "{{ crate.build_script.path }}",
+    {% if crate.build_script_target.path %}
+    crate_root = "{{ crate.build_script_target.path }}",
     {% else %}
     crate_root = "build.rs",
     {% endif %}
@@ -37,7 +37,7 @@ genrule(
         + " export TARGET='{{ crate.platform_triple }}';"
         + " export RUST_BACKTRACE=1;"
         + " export OUT_DIR=$$PWD/{{ crate_name_sanitized }}_out_dir_outputs;"
-        + " export BINARY_PATH=\"$$PWD/$(location :{{ crate_name_sanitized }}_build_scriptj\";"
+        + " export BINARY_PATH=\"$$PWD/$(location :{{ crate_name_sanitized }}_build_script\";"
         + " export OUT_TAR=$$PWD/$@;"
         + " cd $$(dirname $(location :Cargo.toml)) && $$BINARY_PATH && tar -czf $$OUT_TAR -C $$OUT_DIR .)"
 )

@@ -1,4 +1,7 @@
 {% set target_name_sanitized = target.name | replace(from="-", to="_") %}
+
+# NOTE: Example may not function correctly: Development dependencies will be absent
+# TODO(acmcarther/cargo-raze/issues/7): Extend this with dev dependencies
 rust_binary(
     name = "{{ target_name_sanitized }}",
     crate_root = "{{ target.path }}",
@@ -24,4 +27,5 @@ rust_binary(
       "{{feature}}",
       {% endfor %}
     ],
+    visibility = ["//visibility:private"],
 )

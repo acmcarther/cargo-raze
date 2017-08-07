@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Config {
   pub use_build_rs: bool,
@@ -38,7 +36,7 @@ pub struct Metadep {
 pub struct CrateContext {
   pub pkg_name: String,
   pub pkg_version: String,
-  pub features: HashSet<String>,
+  pub features: Vec<String>,
   pub path: String,
   pub dependencies: Vec<Dependency>,
   pub build_dependencies: Vec<Dependency>,
