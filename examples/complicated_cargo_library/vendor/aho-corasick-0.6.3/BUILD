@@ -3,7 +3,7 @@ cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
-package(default_visibility = ["//hello_cargo_library:__subpackages__"])
+package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
 
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
@@ -19,7 +19,7 @@ rust_binary(
     crate_root = "src/main.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    "//hello_cargo_library/vendor/memchr-1.0.1:memchr",
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
     ],
     rustc_flags = [
         "--cap-lints allow",
@@ -35,7 +35,7 @@ rust_library(
     crate_root = "src/lib.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    "//hello_cargo_library/vendor/memchr-1.0.1:memchr",
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
     ],
     rustc_flags = [
         "--cap-lints allow",
@@ -54,7 +54,7 @@ rust_bench_test(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":aho_corasick",
-    "//hello_cargo_library/vendor/memchr-1.0.1:memchr",
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
     
     ],
     rustc_flags = [
@@ -75,7 +75,7 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":aho_corasick",
-    "//hello_cargo_library/vendor/memchr-1.0.1:memchr",
+    "//complicated_cargo_library/vendor/memchr-1.0.1:memchr",
     
     ],
     rustc_flags = [

@@ -3,7 +3,7 @@ cargo-raze crate build file.
 
 DO NOT EDIT! Replaced on runs of cargo-raze
 """
-package(default_visibility = ["//hello_cargo_library:__subpackages__"])
+package(default_visibility = ["//complicated_cargo_library:__subpackages__"])
 
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
@@ -18,7 +18,7 @@ rust_binary(
     srcs = glob(["*", "**/*.rs"]),
     crate_root = "build.rs",
     deps = [
-      "//hello_cargo_library/vendor/metadeps-1.1.2:metadeps",
+      "//complicated_cargo_library/vendor/metadeps-1.1.2:metadeps",
     ]
     rustc_flags = [
         "--cap-lints allow",
@@ -34,7 +34,7 @@ genrule(
     outs = ["x11_out_dir_outputs.tar.gz"],
     tools = [":x11_build_script"],
     cmd = "mkdir x11_out_dir_outputs/;"
-        + " (export CARGO_MANIFEST_DIR=\"$$PWDhello_cargo_library/vendor/x11-2.14.0\";"
+        + " (export CARGO_MANIFEST_DIR=\"$$PWDcomplicated_cargo_library/vendor/x11-2.14.0\";"
         + " export TARGET='x86_64-unknown-linux-gnu';"
         + " export RUST_BACKTRACE=1;"
         + " export OUT_DIR=$$PWD/x11_out_dir_outputs;"
@@ -50,7 +50,7 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":x11",
-    "//hello_cargo_library/vendor/libc-0.2.24:libc",
+    "//complicated_cargo_library/vendor/libc-0.2.24:libc",
     
     ],
     rustc_flags = [
@@ -71,7 +71,7 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":x11",
-    "//hello_cargo_library/vendor/libc-0.2.24:libc",
+    "//complicated_cargo_library/vendor/libc-0.2.24:libc",
     
     ],
     rustc_flags = [
@@ -89,7 +89,7 @@ rust_library(
     crate_root = "src/lib.rs",
     srcs = glob(["**/*.rs"]),
     deps = [
-    "//hello_cargo_library/vendor/libc-0.2.24:libc",
+    "//complicated_cargo_library/vendor/libc-0.2.24:libc",
     ],
     rustc_flags = [
         "--cap-lints allow",
@@ -108,7 +108,7 @@ rust_binary(
     srcs = glob(["**/*.rs"]),
     deps = [
     ":x11",
-    "//hello_cargo_library/vendor/libc-0.2.24:libc",
+    "//complicated_cargo_library/vendor/libc-0.2.24:libc",
     
     ],
     rustc_flags = [
