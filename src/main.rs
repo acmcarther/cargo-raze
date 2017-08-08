@@ -29,14 +29,14 @@ struct Options {
     flag_host: Option<String>,
     flag_color: Option<String>,
     flag_target: Option<String>,
-    flag_dry_run: Option<bool>,
+    flag_dryrun: Option<bool>,
 }
 
 const USAGE: &'static str = r#"
 Generate Bazel BUILD files for your pre-vendored Cargo dependencies.
 
 Usage:
-    cargo raze [options] [<buildprefix>]
+    cargo raze [<buildprefix>] [options]
 
 Options:
     -h, --help                Print this message
@@ -45,7 +45,7 @@ Options:
     -q, --quiet               No output printed to stdout
     --color WHEN              Coloring: auto, always, never
     --target TARGET           Platform to generate BUILD files for
-    --dry_run                 Do not emit any files
+    -d, --dryrun              Do not emit any files
 "#;
 
 fn main() {
@@ -77,7 +77,7 @@ fn real_main(options: Options, config: &Config) -> CliResult {
   let planned_build = try!(planner.plan_build());
   let file_outputs = try!(planned_build.render());
 
-  let dry_run = options.flag_dry_run.unwrap_or(false);
+  let dry_run = options.flag_dryrun.unwrap_or(false);
   for FileOutputs { path, contents } in file_outputs {
     if !dry_run {
       try!(write_to_file_loudly(&path, &contents));
