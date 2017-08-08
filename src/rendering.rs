@@ -1,8 +1,8 @@
-use tera;
-use tera::Context;
-use tera::Tera;
 use context::CrateContext;
 use context::WorkspaceContext;
+use tera::Context;
+use tera::Tera;
+use tera;
 
 pub struct Renderer {
   renderer: Tera,

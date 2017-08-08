@@ -9,13 +9,14 @@ extern crate tera;
 mod context;
 mod planning;
 mod rendering;
+mod util;
 
-use planning::BuildPlanner;
-use planning::FileOutputs;
 use cargo::CargoError;
 use cargo::CliResult;
 use cargo::util::CargoResult;
 use cargo::util::Config;
+use planning::BuildPlanner;
+use planning::FileOutputs;
 use std::env;
 use std::fs::File;
 use std::io::Write;

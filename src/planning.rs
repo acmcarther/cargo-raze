@@ -5,7 +5,6 @@ use cargo::core::PackageId;
 use cargo::core::PackageSet;
 use cargo::core::Resolve;
 use cargo::core::SourceId;
-use cargo::core::TargetKind;
 use cargo::core::Workspace;
 use cargo::core::dependency::Kind;
 use cargo::ops::Packages;
@@ -14,20 +13,19 @@ use cargo::util::CargoResult;
 use cargo::util::Cfg;
 use cargo::util::Config;
 use cargo::util::ToUrl;
+use context::BazelConfig;
+use context::BazelDependency;
+use context::BazelTarget;
+use context::CrateContext;
+use context::WorkspaceContext;
+use rendering::Renderer;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::ops::Deref;
 use std::path::Path;
-use std::process::Command;
-use std::str::FromStr;
 use std::str;
-use rendering::Renderer;
-use context::CrateContext;
-use context::BazelDependency;
-use context::BazelConfig;
-use context::BazelTarget;
-use context::WorkspaceContext;
+use util;
 
 pub struct BuildPlanner<'a> {
   workspace_prefix: String,
@@ -71,7 +69,7 @@ impl <'a>  BuildPlanner<'a> {
   pub fn new(workspace_prefix: String, platform_triple: String, config: &'a Config) -> CargoResult<BuildPlanner<'a>> {
     Ok(BuildPlanner {
       workspace_prefix: workspace_prefix,
-      platform_attrs: try!(fetch_attrs(&platform_triple)),
+      platform_attrs: try!(util::fetch_attrs(&platform_triple)),
       platform_triple: platform_triple,
       config: config,
       registry: None,
@@ -160,40 +158,6 @@ pub struct FileOutputs {
   pub contents: String
 }
 
-/**
- * Gets the proper system attributes for the provided platform triple using rustc.
- */
-fn fetch_attrs(target: &str) -> CargoResult<Vec<Cfg>> {
-    let args = vec![
-      format!("--target={}", target),
-      "--print=cfg".to_owned(),
-    ];
-
-
-    let output = try!(Command::new("rustc")
-        .args(&args)
-        .output()
-        .map_err(|_| CargoError::from(format!("could not run rustc to fetch attrs for target {}", target))));
-
-    if !output.status.success() {
-      panic!(format!("getting target attrs for {} failed with status: '{}' \n\
-                     stdout: {}\n\
-                     stderr: {}",
-                     target,
-                     output.status,
-                     String::from_utf8(output.stdout).unwrap_or("[unparseable bytes]".to_owned()),
-                     String::from_utf8(output.stderr).unwrap_or("[unparseable bytes]".to_owned())))
-    }
-
-    let attr_str = String::from_utf8(output.stdout)
-        .expect("successful run of rustc's output to be utf8");
-
-    Ok(attr_str.lines()
-        .map(Cfg::from_str)
-        .map(|cfg| cfg.expect("attrs from rustc should be parsable into Cargo Cfg"))
-        .collect())
-}
-
 
 /** The set of all included dependencies for Cargo's dependency categories. */
 pub struct PlannedDeps {
@@ -222,9 +186,9 @@ impl PlannedDeps {
             })
             .cloned()
             .collect::<Vec<Dependency>>();
-        let build_deps = take_kinded_dep_names(&platform_deps, Kind::Build);
-        let dev_deps = take_kinded_dep_names(&platform_deps, Kind::Development);
-        let normal_deps = take_kinded_dep_names(&platform_deps, Kind::Normal);
+        let build_deps = util::take_kinded_dep_names(&platform_deps, Kind::Build);
+        let dev_deps = util::take_kinded_dep_names(&platform_deps, Kind::Development);
+        let normal_deps = util::take_kinded_dep_names(&platform_deps, Kind::Normal);
         let resolved_deps = resolve.deps(&id).into_iter()
             .map(|dep| BazelDependency {
                 name: dep.name().to_owned(),
@@ -310,7 +274,7 @@ fn identify_targets(full_name: &str, package: &CargoPackage) -> CargoResult<Vec<
           .skip(crate_name_str_idx + partial_path_byte_length)
           .collect::<Vec<_>>();
         let local_path_str = String::from_utf8(local_path_bytes).unwrap();
-        for kind in kind_to_kinds(target.kind()) {
+        for kind in util::kind_to_kinds(target.kind()) {
           targets.push(BazelTarget {
             name: target.name().to_owned(),
             path: local_path_str.clone(),
@@ -321,29 +285,3 @@ fn identify_targets(full_name: &str, package: &CargoPackage) -> CargoResult<Vec<
 
     Ok(targets)
 }
-
-/** Extracts the dependencies that are of the provided kind. */
-fn take_kinded_dep_names(platform_deps: &Vec<Dependency>, kind: Kind) -> HashSet<String> {
-  platform_deps
-    .iter()
-    .filter(|d| d.kind() == kind)
-    .map(|dep| dep.name().to_owned())
-    .collect()
-}
-
-/**
- * Extracts consistently named Strings for the provided TargetKind.
- *
- * TODO(acmcarther): Remove this shim borrowed from Cargo when Cargo is upgraded
- */
-fn kind_to_kinds(kind: &TargetKind) -> Vec<String> {
-    match kind {
-        &TargetKind::Lib(ref kinds) => kinds.iter().map(|k| k.crate_type().to_owned()).collect(),
-        &TargetKind::Bin => vec!["bin".to_owned()],
-        &TargetKind::ExampleBin | &TargetKind::ExampleLib(_) => vec!["example".to_owned()],
-        &TargetKind::Test => vec!["test".to_owned()],
-        &TargetKind::CustomBuild => vec!["custom-build".to_owned()],
-        &TargetKind::Bench => vec!["bench".to_owned()],
-    }
-}
-
