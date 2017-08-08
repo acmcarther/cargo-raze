@@ -27,14 +27,6 @@ use std::path::Path;
 use std::str;
 use util;
 
-pub struct BuildPlanner<'a> {
-  workspace_prefix: String,
-  platform_triple: String,
-  config: &'a Config,
-  platform_attrs: Vec<Cfg>,
-  registry: Option<SourceId>,
-}
-
 pub struct PlannedBuild {
   workspace_context: WorkspaceContext,
   crate_contexts: Vec<CrateContext>,
@@ -63,6 +55,19 @@ impl PlannedBuild {
     file_outputs.push(FileOutputs { path: build_file_path, contents: rendered_alias_build_file });
     Ok(file_outputs)
   }
+}
+
+pub struct FileOutputs {
+  pub path: String,
+  pub contents: String
+}
+
+pub struct BuildPlanner<'a> {
+  workspace_prefix: String,
+  platform_triple: String,
+  config: &'a Config,
+  platform_attrs: Vec<Cfg>,
+  registry: Option<SourceId>,
 }
 
 impl <'a>  BuildPlanner<'a> {
@@ -152,12 +157,6 @@ impl <'a>  BuildPlanner<'a> {
       Ok(PlannedBuild::new(workspace_context, crate_contexts))
   }
 }
-
-pub struct FileOutputs {
-  pub path: String,
-  pub contents: String
-}
-
 
 /** The set of all included dependencies for Cargo's dependency categories. */
 pub struct PlannedDeps {
