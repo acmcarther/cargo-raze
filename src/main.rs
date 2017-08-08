@@ -5,48 +5,20 @@ extern crate cargo;
 extern crate rustc_serialize;
 extern crate itertools;
 extern crate tera;
-#[macro_use]
-extern crate lazy_static;
 
-#[macro_use]
-mod bazel;
+mod context;
 mod planning;
+mod rendering;
 
+use planning::BuildPlanner;
+use planning::FileOutputs;
 use cargo::CargoError;
 use cargo::CliResult;
 use cargo::util::CargoResult;
-use cargo::util::Cfg;
 use cargo::util::Config;
-use planning::PlannedDeps;
-use planning::ResolvedPlan;
-use std::collections::HashSet;
 use std::env;
 use std::fs::File;
-use std::fs;
 use std::io::Write;
-use std::ops::Deref;
-use std::process::Command;
-use std::str::FromStr;
-use std::str;
-use tera::Context;
-use tera::Tera;
-
-lazy_static! {
-    pub static ref TERA: Tera = {
-      // Configure tera with a bogus template dir: We don't want any runtime template support
-      let mut tera = Tera::new("src/not/a/dir/*").unwrap();
-      tera.add_raw_templates(vec![
-        ("templates/partials/rust_binary.template", include_str!("templates/partials/rust_binary.template")),
-        ("templates/partials/rust_library.template", include_str!("templates/partials/rust_library.template")),
-        ("templates/partials/rust_test.template", include_str!("templates/partials/rust_test.template")),
-        ("templates/partials/rust_bench_test.template", include_str!("templates/partials/rust_bench_test.template")),
-        ("templates/partials/rust_example.template", include_str!("templates/partials/rust_example.template")),
-        ("templates/partials/build_script.template", include_str!("templates/partials/build_script.template")),
-        ("templates/workspace.BUILD.template", include_str!("templates/workspace.BUILD.template")),
-        ("templates/crate.BUILD.template", include_str!("templates/crate.BUILD.template"))]).unwrap();
-      tera
-    };
-}
 
 #[derive(Debug, RustcDecodable)]
 struct Options {
@@ -55,7 +27,8 @@ struct Options {
     flag_quiet: Option<bool>,
     flag_host: Option<String>,
     flag_color: Option<String>,
-    flag_targets: Option<String>,
+    flag_target: Option<String>,
+    flag_dry_run: Option<bool>,
 }
 
 const USAGE: &'static str = r#"
@@ -70,7 +43,8 @@ Options:
     --host HOST               Registry index to sync with
     -q, --quiet               No output printed to stdout
     --color WHEN              Coloring: auto, always, never
-    --targets TARGETS         List of comma-separated target triples to generate BUILD for
+    --target TARGET           Platform to generate BUILD files for
+    --dry_run                 Do not emit any files
 "#;
 
 fn main() {
@@ -84,115 +58,45 @@ fn main() {
 }
 
 fn real_main(options: Options, config: &Config) -> CliResult {
-    try!(config.configure(options.flag_verbose,
-                          options.flag_quiet,
-                          &options.flag_color,
-                          /* frozen = */ false,
-                          /* locked = */ false));
-    let workspace_prefix = try!(validate_workspace_prefix(options.arg_buildprefix));
+  try!(config.configure(options.flag_verbose,
+                        options.flag_quiet,
+                        &options.flag_color,
+                        /* frozen = */ false,
+                        /* locked = */ false));
+  let mut planner = try!(BuildPlanner::new(
+    try!(validate_workspace_prefix(options.arg_buildprefix)),
+    options.flag_target.expect("--target flag is mandatory: try 'x86_64-unknown-linux-gnu'"),
+    config,
+  ));
 
-    let ResolvedPlan {root_name, packages, resolve} =
-        try!(ResolvedPlan::resolve_from_files(&config));
+  if let Some(host) = options.flag_host {
+    try!(planner.set_registry_from_url(host));
+  }
 
-    let root_package_id = try!(resolve.iter()
-        .filter(|dep| dep.name() == root_name)
-        .next()
-        .ok_or(CargoError::from("root crate should be in cargo resolve")));
-    let root_direct_deps = resolve.deps(&root_package_id).cloned().collect::<HashSet<_>>();
+  let planned_build = try!(planner.plan_build());
+  let file_outputs = try!(planned_build.render());
 
-    let targets_str = options.flag_targets.expect("--targets flag is mandatory: try 'x86_64-unknown-linux-gnu'");
-    let platform_triple_env_pairs = targets_str
-      .split(',')
-      .map(|triple| {
-        // Non lexical borrow dodge
-        let attrs = fetch_attrs(triple);
-        (triple, attrs)
-      })
-      .collect::<Vec<_>>();
-
-
-    let mut crate_contexts = Vec::new();
-    let platform_count = platform_triple_env_pairs.len();
-    let (platform_triple, platform_attrs) = platform_triple_env_pairs.get(0).cloned().unwrap();
-    if platform_count > 1 {
-      println!("WARNING: currently only a single target platform is supported.");
-      println!("Using target {}", platform_triple);
+  let dry_run = options.flag_dry_run.unwrap_or(false);
+  for FileOutputs { path, contents } in file_outputs {
+    if !dry_run {
+      try!(write_to_file_loudly(&path, &contents));
+    } else {
+      println!("{}:\n{}", path, contents);
     }
+  }
 
-    // TODO:(acmcarther): Reduce duplicate work: the next 20 lines are copy paste per platform
-    for id in try!(planning::find_all_package_ids(options.flag_host.clone(), &config, &resolve)) {
-        let package = packages.get(&id).unwrap().clone();
-        let mut features = resolve.features(&id).clone().into_iter().collect::<Vec<_>>();
-        features.sort();
-        let full_name = format!("{}-{}", id.name(), id.version());
-        let path = format!("./vendor/{}-{}/", id.name(), id.version());
-
-        // Verify that package is really vendored
-        try!(fs::metadata(&path).map_err(|_| {
-            CargoError::from(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
-        }));
-
-        // Identify all possible dependencies
-        let PlannedDeps { mut build_deps, mut dev_deps, mut normal_deps } =
-            PlannedDeps::find_all_deps(&id, &package, &resolve, &platform_triple, &platform_attrs);
-        build_deps.sort();
-        dev_deps.sort();
-        normal_deps.sort();
-
-        let mut targets = try!(planning::identify_targets(&full_name, &package));
-        targets.sort();
-        let build_script_target = targets.iter().find(|t| t.kind.deref() == "custom-build").cloned();
-        let targets_sans_build_script = 
-          targets.into_iter().filter(|t| t.kind.deref() != "custom-build").collect::<Vec<_>>();
-
-        crate_contexts.push(bazel::CrateContext {
-            pkg_name: id.name().to_owned(),
-            pkg_version: id.version().to_string(),
-            features: features,
-            is_root_dependency: root_direct_deps.contains(&id),
-            metadeps: Vec::new() /* TODO(acmcarther) */,
-            dependencies: normal_deps,
-            build_dependencies: build_deps,
-            dev_dependencies: dev_deps,
-            path: path,
-            build_script_target: build_script_target,
-            targets: targets_sans_build_script,
-            bazel_config: bazel::Config::default(),
-            platform_triple: platform_triple.to_owned(),
-        });
-    }
-
-    for package in &crate_contexts {
-      //let crate_context = package.to_crate_context();
-      let mut context = Context::new();
-      context.add("crate", &package);
-      context.add("path_prefix", &workspace_prefix);
-      let rendered_crate_build_file = TERA.render("templates/crate.BUILD.template", &context).unwrap();
-
-      let build_file_path = format!("{}BUILD", &package.path);
-      try!(File::create(&build_file_path)
-           .and_then(|mut f| f.write_all(rendered_crate_build_file.as_bytes()))
-           .map_err(|_| CargoError::from(format!("failed to create {}", build_file_path))));
-      println!("Generated {} successfully", build_file_path);
-    }
-
-    let mut context = Context::new();
-    context.add("path_prefix", &workspace_prefix);
-    context.add("crates", &crate_contexts);
-    let rendered_alias_build_file = TERA.render("templates/workspace.BUILD.template", &context).unwrap();
-    let build_file_path = "vendor/BUILD";
-    try!(File::create(&build_file_path)
-         .and_then(|mut f| f.write_all(rendered_alias_build_file.as_bytes()))
-         .map_err(|_| CargoError::from(format!("failed to create {}", build_file_path))));
-    println!("Generated {} successfully", build_file_path);
-
-    Ok(())
+  Ok(())
 }
 
 /** Verifies that the provided workspace_prefix is present and makes sense. */
 fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> CargoResult<String> {
     let workspace_prefix = try!(arg_buildprefix.ok_or(CargoError::from(
         "build prefix must be specified (in the form //path/where/vendor/is)")));
+
+    if !(workspace_prefix.starts_with("//") || workspace_prefix.starts_with("@")) {
+        return Err(CargoError::from(
+            format!("Bazel path \"{}\" should begin with \"//\" or \"@\"", workspace_prefix)));
+    }
 
     if workspace_prefix.ends_with("/vendor") {
         return Err(CargoError::from(
@@ -208,36 +112,39 @@ fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> CargoResult<Str
     Ok(workspace_prefix)
 }
 
-
-/**
- * Gets the proper system attributes for the provided platform triple using rustc.
- */
-fn fetch_attrs(target: &str) -> Vec<Cfg> {
-    let args = vec![
-      format!("--target={}", target),
-      "--print=cfg".to_owned(),
-    ];
-    let output = Command::new("rustc")
-        .args(&args)
-        .output()
-        .expect(&format!("could not run rustc to fetch attrs for target {}", target));
-
-    if !output.status.success() {
-      panic!(format!("getting target attrs for {} failed with status: '{}' \n\
-                     stdout: {}\n\
-                     stderr: {}",
-                     target,
-                     output.status,
-                     String::from_utf8(output.stdout).unwrap_or("[unparseable bytes]".to_owned()),
-                     String::from_utf8(output.stderr).unwrap_or("[unparseable bytes]".to_owned())))
-    }
-
-    let attr_str = String::from_utf8(output.stdout)
-        .expect("successful run of rustc's output to be utf8");
-
-    attr_str.lines()
-        .map(Cfg::from_str)
-        .map(|cfg| cfg.expect("attrs from rustc should be parsable into Cargo Cfg"))
-        .collect()
+fn write_to_file_loudly(path: &str, contents: &str) -> CargoResult<()> {
+  try!(File::create(&path)
+     .and_then(|mut f| f.write_all(contents.as_bytes()))
+     .map_err(|_| CargoError::from(format!("failed to create {}", path))));
+  println!("Generated {} successfully", path);
+  Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_validate_prefix_expects_some_value() {
+    assert!(validate_workspace_prefix(None).is_err());
+  }
+
+  #[test]
+  fn test_validate_prefix_expects_initial_slashes_or_at() {
+    assert!(validate_workspace_prefix(Some("hello".to_owned())).is_err());
+    assert!(validate_workspace_prefix(Some("@hello".to_owned())).is_ok());
+    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
+  }
+
+  #[test]
+  fn test_validate_prefix_expects_no_vendor() {
+    assert!(validate_workspace_prefix(Some("//hello/vendor".to_owned())).is_err());
+    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
+  }
+
+  #[test]
+  fn test_validate_prefix_expects_no_slash() {
+    assert!(validate_workspace_prefix(Some("//hello/".to_owned())).is_err());
+    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
+  }
+}

@@ -1,12 +1,12 @@
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub struct Config {
+pub struct BazelConfig {
   pub use_build_rs: bool,
   pub use_metadeps: bool
 }
 
-impl Default for Config {
-  fn default() -> Config {
-    Config {
+impl Default for BazelConfig {
+  fn default() -> BazelConfig {
+    BazelConfig {
       use_build_rs: true,
       use_metadeps: false,
     }
@@ -14,13 +14,13 @@ impl Default for Config {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub struct Dependency {
+pub struct BazelDependency {
   pub name: String,
   pub version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub struct Target {
+pub struct BazelTarget {
   pub name: String,
   pub kind: String,
   pub path: String,
@@ -38,20 +38,20 @@ pub struct CrateContext {
   pub pkg_version: String,
   pub features: Vec<String>,
   pub path: String,
-  pub dependencies: Vec<Dependency>,
-  pub build_dependencies: Vec<Dependency>,
-  pub dev_dependencies: Vec<Dependency>,
+  pub dependencies: Vec<BazelDependency>,
+  pub build_dependencies: Vec<BazelDependency>,
+  pub dev_dependencies: Vec<BazelDependency>,
   pub is_root_dependency: bool,
-  pub bazel_config: Config,
+  pub bazel_config: BazelConfig,
   pub metadeps: Vec<Metadep>,
   pub platform_triple: String,
-  pub targets: Vec<Target>,
-  pub build_script_target: Option<Target>,
+  pub targets: Vec<BazelTarget>,
+  pub build_script_target: Option<BazelTarget>,
   // TODO(acmcarther): Consider plugin topic
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct WorkspaceContext {
   pub workspace_prefix: String,
-  pub platforms: Vec<String>,
+  pub platform_triple: String,
 }
