@@ -146,6 +146,8 @@ mod tests {
   #[test]
   fn test_validate_prefix_expects_no_slash() {
     assert!(validate_workspace_prefix(Some("//hello/".to_owned())).is_err());
+    // Vendoring into root is a really annoying edge case, not supported for now.
+    assert!(validate_workspace_prefix(Some("//".to_owned())).is_err());
     assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
   }
 }
