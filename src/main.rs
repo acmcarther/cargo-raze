@@ -10,13 +10,17 @@ mod context;
 mod planning;
 mod rendering;
 mod util;
+mod bazel;
 
+use bazel::BazelRenderer;
 use cargo::CargoError;
 use cargo::CliResult;
 use cargo::util::CargoResult;
 use cargo::util::Config;
 use planning::BuildPlanner;
-use planning::FileOutputs;
+use rendering::FileOutputs;
+use rendering::BuildRenderer;
+use rendering::RenderDetails;
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -33,7 +37,7 @@ struct Options {
 }
 
 const USAGE: &'static str = r#"
-Generate Bazel BUILD files for your pre-vendored Cargo dependencies.
+Generate BUILD files for your pre-vendored Cargo dependencies.
 
 Usage:
     cargo raze [<buildprefix>] [options]
@@ -75,10 +79,15 @@ fn real_main(options: Options, config: &Config) -> CliResult {
   }
 
   let planned_build = try!(planner.plan_build());
-  let file_outputs = try!(planned_build.render());
+  let mut bazel_renderer = BazelRenderer::new();
+  let render_details = RenderDetails {
+    path_prefix: "./".to_owned(),
+  };
+
+  let bazel_file_outputs = try!(bazel_renderer.render_planned_build(&render_details, &planned_build));
 
   let dry_run = options.flag_dryrun.unwrap_or(false);
-  for FileOutputs { path, contents } in file_outputs {
+  for FileOutputs { path, contents } in bazel_file_outputs {
     if !dry_run {
       try!(write_to_file_loudly(&path, &contents));
     } else {
@@ -96,17 +105,17 @@ fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> CargoResult<Str
 
     if !(workspace_prefix.starts_with("//") || workspace_prefix.starts_with("@")) {
         return Err(CargoError::from(
-            format!("Bazel path \"{}\" should begin with \"//\" or \"@\"", workspace_prefix)));
+            format!("Workspace path \"{}\" should begin with \"//\" or \"@\"", workspace_prefix)));
     }
 
     if workspace_prefix.ends_with("/vendor") {
         return Err(CargoError::from(
-            format!("Bazel path \"{}\" should not end with /vendor, you probably want \"{}\"",
+            format!("Workspace path \"{}\" should not end with /vendor, you probably want \"{}\"",
                     workspace_prefix, workspace_prefix.chars().take(workspace_prefix.chars().count() - 7).collect::<String>())));
     }
     if workspace_prefix.ends_with("/") {
         return Err(CargoError::from(
-            format!("Bazel path \"{}\" should not end with /, you probably want \"{}\"",
+            format!("Workspace path \"{}\" should not end with /, you probably want \"{}\"",
                     workspace_prefix, workspace_prefix.chars().take(workspace_prefix.chars().count() - 1).collect::<String>())));
     }
 

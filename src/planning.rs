@@ -13,12 +13,10 @@ use cargo::util::CargoResult;
 use cargo::util::Cfg;
 use cargo::util::Config;
 use cargo::util::ToUrl;
-use context::BazelConfig;
-use context::BazelDependency;
-use context::BazelTarget;
+use context::BuildDependency;
+use context::BuildTarget;
 use context::CrateContext;
 use context::WorkspaceContext;
-use rendering::Renderer;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -28,38 +26,8 @@ use std::str;
 use util;
 
 pub struct PlannedBuild {
-  workspace_context: WorkspaceContext,
-  crate_contexts: Vec<CrateContext>,
-}
-
-impl PlannedBuild {
-  pub fn new(workspace_context: WorkspaceContext, crate_contexts: Vec<CrateContext>) -> PlannedBuild {
-    PlannedBuild {
-      workspace_context: workspace_context,
-      crate_contexts: crate_contexts,
-    }
-  }
-
-  pub fn render(&self) -> CargoResult<Vec<FileOutputs>> {
-    let renderer = Renderer::new(self.workspace_context.clone());
-
-    let mut file_outputs = Vec::new();
-    for package in &self.crate_contexts {
-      let build_file_path = format!("{}BUILD", &package.path);
-      let rendered_crate_build_file = try!(renderer.render_crate(&package).map_err(|e| CargoError::from(e.to_string())));
-      file_outputs.push(FileOutputs { path: build_file_path, contents: rendered_crate_build_file })
-    }
-
-    let build_file_path = "vendor/BUILD".to_owned();
-    let rendered_alias_build_file = try!(renderer.render_aliases(&self.crate_contexts).map_err(|e| CargoError::from(e.to_string())));
-    file_outputs.push(FileOutputs { path: build_file_path, contents: rendered_alias_build_file });
-    Ok(file_outputs)
-  }
-}
-
-pub struct FileOutputs {
-  pub path: String,
-  pub contents: String
+  pub workspace_context: WorkspaceContext,
+  pub crate_contexts: Vec<CrateContext>,
 }
 
 pub struct BuildPlanner<'a> {
@@ -145,7 +113,6 @@ impl <'a>  BuildPlanner<'a> {
               path: path,
               build_script_target: build_script_target,
               targets: targets_sans_build_script,
-              bazel_config: BazelConfig::default(),
               platform_triple: self.platform_triple.to_owned(),
           });
       }
@@ -154,15 +121,18 @@ impl <'a>  BuildPlanner<'a> {
         workspace_prefix: self.workspace_prefix.clone(),
         platform_triple: self.platform_triple.clone(),
       };
-      Ok(PlannedBuild::new(workspace_context, crate_contexts))
+      Ok(PlannedBuild{
+        workspace_context: workspace_context,
+        crate_contexts: crate_contexts
+      })
   }
 }
 
 /** The set of all included dependencies for Cargo's dependency categories. */
 pub struct PlannedDeps {
-    pub build_deps: Vec<BazelDependency>,
-    pub dev_deps: Vec<BazelDependency>,
-    pub normal_deps: Vec<BazelDependency>,
+    pub build_deps: Vec<BuildDependency>,
+    pub dev_deps: Vec<BuildDependency>,
+    pub normal_deps: Vec<BuildDependency>,
 }
 
 impl PlannedDeps {
@@ -189,11 +159,11 @@ impl PlannedDeps {
         let dev_deps = util::take_kinded_dep_names(&platform_deps, Kind::Development);
         let normal_deps = util::take_kinded_dep_names(&platform_deps, Kind::Normal);
         let resolved_deps = resolve.deps(&id).into_iter()
-            .map(|dep| BazelDependency {
+            .map(|dep| BuildDependency {
                 name: dep.name().to_owned(),
                 version: dep.version().to_string(),
             })
-            .collect::<Vec<BazelDependency>>();
+            .collect::<Vec<BuildDependency>>();
 
         PlannedDeps {
            normal_deps:
@@ -257,8 +227,8 @@ fn find_all_package_ids(registry_id: SourceId, resolve: &Resolve) -> CargoResult
 }
 
 
-/** Derives bazel target objects from Cargo's target information. */
-fn identify_targets(full_name: &str, package: &CargoPackage) -> CargoResult<Vec<BazelTarget>> {
+/** Derives target objects from Cargo's target information. */
+fn identify_targets(full_name: &str, package: &CargoPackage) -> CargoResult<Vec<BuildTarget>> {
     let partial_path = format!("{}/", full_name);
     let partial_path_byte_length = partial_path.as_bytes().len();
     let mut targets = Vec::new();
@@ -274,7 +244,7 @@ fn identify_targets(full_name: &str, package: &CargoPackage) -> CargoResult<Vec<
           .collect::<Vec<_>>();
         let local_path_str = String::from_utf8(local_path_bytes).unwrap();
         for kind in util::kind_to_kinds(target.kind()) {
-          targets.push(BazelTarget {
+          targets.push(BuildTarget {
             name: target.name().to_owned(),
             path: local_path_str.clone(),
             kind: kind,
