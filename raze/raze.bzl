@@ -55,7 +55,7 @@ def _handle_near_overrides(package, close_overrides):
           .format(package.pkg_name, package.pkg_version, close_override_versions))
 
 
-def _generate_build_script_targets(name, srcs, target, crate_bzl, workspace_path, platform):
+def _generate_build_script_targets(name, srcs, data, target, crate_bzl, workspace_path, platform):
     """
     Generates bazel build targets for a build script to be executed prior to building the library.
 
@@ -72,6 +72,7 @@ def _generate_build_script_targets(name, srcs, target, crate_bzl, workspace_path
     rust_binary(
         name = name + "_build_script",
         srcs = srcs,
+        data = data,
         crate_root = target.path,
         deps = deps,
         rustc_flags = [
@@ -83,7 +84,7 @@ def _generate_build_script_targets(name, srcs, target, crate_bzl, workspace_path
     native.genrule(
         name = name + "_build_script_executor",
         # TODO: This may not play nice with source_replacement
-        srcs = srcs,
+        srcs = srcs + data,
         outs = [name + "_out_dir_outputs.tar.gz"],
         tools = [":" + name + "_build_script"],
         cmd = "mkdir " + name + "_out_dir_outputs/;"
@@ -184,8 +185,9 @@ def cargo_library(srcs, crate_bzl, cargo_override_bzl, platform, workspace_path=
     if build_script_target:
       _generate_build_script_targets(
           name,
-          srcs + native.glob(["*"]),
-          target,
+          srcs,
+          native.glob(["**"], exclude=srcs),
+          build_script_target,
           crate_bzl,
           workspace_path,
           platform

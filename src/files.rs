@@ -182,7 +182,7 @@ load("{workspace_prefix}:Cargo.bzl", "workspace")
 load("{workspace_prefix}:CargoOverrides.bzl", "override_cfg")
 
 cargo_library(
-    srcs = glob(["lib.rs", "src/**/*.rs"]),
+    srcs = glob(["*.rs", "**/*.rs"]),
     crate_bzl = description,
     cargo_override_bzl = override_cfg,
     platform = workspace.platform,
