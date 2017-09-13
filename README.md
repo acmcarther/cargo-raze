@@ -4,7 +4,10 @@
 
 A cargo subcommand to generate platform-specific BUILD files.
 
-Also, a bazel ruleset for using the outputs of that cargo subcommand.  
+Also, a bazel ruleset for using the outputs of that cargo subcommand.
+
+See examples in the automatically updated examples repository:
+[github.com/acmcarther/cargo-raze-examples](https://github.com/acmcarther/cargo-raze-examples)
 
 ## WARNING!!!
 
@@ -49,8 +52,6 @@ cargo vendor -x
 cargo raze "//path/to/vendor"
 ```
 You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to link your dependencies up. You will also get starter BUILD files that reference those .bzl files.
-
-See the [example](examples/hello_cargo_library/README.md) for further details.
 
 See my hobby project [space_coop](https://github.com/acmcarther/next_space_coop) for a real life example.
 
