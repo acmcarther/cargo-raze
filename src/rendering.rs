@@ -1,11 +1,13 @@
 use cargo::util::CargoResult;
 use planning::PlannedBuild;
 
+#[derive(Debug, Clone)]
 pub struct FileOutputs {
   pub path: String,
   pub contents: String
 }
 
+#[derive(Debug, Clone)]
 pub struct RenderDetails {
   pub path_prefix: String
 }

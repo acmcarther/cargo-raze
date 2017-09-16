@@ -66,3 +66,153 @@ impl BuildRenderer for BazelRenderer {
     Ok(file_outputs)
   }
 }
+
+#[cfg(test)]
+mod tests {
+  pub use super::*;
+  pub use planning::PlannedBuild;
+  pub use rendering::RenderDetails;
+  pub use rendering::FileOutputs;
+  pub use context::*;
+  pub use hamcrest::prelude::*;
+  pub use hamcrest::core::expect;
+
+  fn dummy_render_details() -> RenderDetails {
+    RenderDetails {
+      path_prefix: "./some_render_prefix".to_owned(),
+    }
+  }
+
+  fn dummy_planned_build(crate_contexts: Vec<CrateContext>) -> PlannedBuild {
+    PlannedBuild {
+      workspace_context: WorkspaceContext {
+        workspace_prefix: "//workspace/prefix".to_owned(),
+        platform_triple: "irrelevant".to_owned(),
+      },
+      crate_contexts: crate_contexts,
+    }
+  }
+
+  fn dummy_binary_crate() -> CrateContext {
+    CrateContext {
+      pkg_name: "test-binary".to_owned(),
+      pkg_version: "1.1.1".to_owned(),
+      features: vec!["feature1".to_owned(), "feature2".to_owned()].to_owned(),
+      path: "vendor/test-binary-1.1.1/".to_owned(),
+      dependencies: Vec::new(),
+      build_dependencies: Vec::new(),
+      dev_dependencies: Vec::new(),
+      is_root_dependency: true,
+      metadeps: Vec::new(),
+      platform_triple: "irrelevant".to_owned(),
+      targets: vec![
+        BuildTarget {
+          name: "some_binary".to_owned(),
+          kind: "bin".to_owned(),
+          path: "bin/main.rs".to_owned()
+        }
+      ],
+      build_script_target: None,
+    }
+  }
+
+  fn dummy_library_crate() -> CrateContext {
+    CrateContext {
+      pkg_name: "test-library".to_owned(),
+      pkg_version: "1.1.1".to_owned(),
+      features: vec!["feature1".to_owned(), "feature2".to_owned()].to_owned(),
+      path: "vendor/test-library-1.1.1/".to_owned(),
+      dependencies: Vec::new(),
+      build_dependencies: Vec::new(),
+      dev_dependencies: Vec::new(),
+      is_root_dependency: true,
+      metadeps: Vec::new(),
+      platform_triple: "irrelevant".to_owned(),
+      targets: vec![
+        BuildTarget {
+          name: "some_library".to_owned(),
+          kind: "lib".to_owned(),
+          path: "path/lib.rs".to_owned()
+        }
+      ],
+      build_script_target: None,
+    }
+  }
+
+  fn extract_contents_matching_path(file_outputs: &Vec<FileOutputs>, crate_name: &str) -> String {
+    let mut matching_files_contents = file_outputs
+      .iter()
+      .filter(|output| output.path.contains(crate_name))
+      .map(|output| output.contents.to_owned())
+      .collect::<Vec<String>>();
+
+    assert_that!(matching_files_contents.len(), equal_to(1));
+    matching_files_contents.pop().unwrap()
+  }
+
+  fn render_crates_for_test(contexts: Vec<CrateContext>) -> Vec<FileOutputs> {
+    BazelRenderer::new().render_planned_build(
+      &dummy_render_details(),
+      &dummy_planned_build(contexts)) .unwrap()
+  }
+
+  #[test]
+  fn all_plans_contain_root_build_file() {
+    let file_outputs = render_crates_for_test(Vec::new());
+    let file_names = file_outputs.iter().map(|output| output.path.as_ref()).collect::<Vec<&str>>();
+
+    assert_that!(&file_names, contains(vec!["./some_render_prefix/vendor/BUILD"]).exactly());
+  }
+
+  #[test]
+  fn crates_generate_build_files() {
+    let file_outputs = render_crates_for_test(vec![dummy_library_crate()]);
+    let file_names = file_outputs.iter().map(|output| output.path.as_ref()).collect::<Vec<&str>>();
+
+    assert_that!(&file_names,
+                 contains(vec!["./some_render_prefix/vendor/BUILD", "./some_render_prefix/vendor/test-library-1.1.1/BUILD"]).exactly());
+  }
+
+  #[test]
+  fn root_crates_get_build_aliases() {
+    let file_outputs = render_crates_for_test(vec![dummy_library_crate()]);
+    let root_build_contents = extract_contents_matching_path(&file_outputs, "vendor/BUILD");
+
+    expect(root_build_contents.contains("alias"),
+      format!("expected root build contents to contain an alias \
+              for test-library crate, but it just contained [{}]", root_build_contents)).unwrap();
+  }
+
+  #[test]
+  fn non_root_crates_dont_get_build_aliases() {
+    let mut non_root_crate = dummy_library_crate();
+    non_root_crate.is_root_dependency = false;
+
+    let file_outputs = render_crates_for_test(vec![non_root_crate]);
+    let root_build_contents = extract_contents_matching_path(&file_outputs, "vendor/BUILD");
+
+    expect(!root_build_contents.contains("alias"),
+      format!("expected root build contents not to contain an alias \
+              for test-library crate, but it just contained [{}]", root_build_contents)).unwrap();
+  }
+
+  #[test]
+  fn binaries_get_rust_binary_rules() {
+    let file_outputs = render_crates_for_test(vec![dummy_binary_crate()]);
+    let crate_build_contents = extract_contents_matching_path(&file_outputs, "vendor/test-binary-1.1.1/BUILD");
+
+    expect(crate_build_contents.contains("rust_binary("),
+      format!("expected crate build contents to contain rust_binary, \
+              but it just contained [{}]", crate_build_contents)).unwrap();
+  }
+
+  #[test]
+  fn libraries_get_rust_library_rules() {
+    let file_outputs = render_crates_for_test(vec![dummy_library_crate()]);
+    let crate_build_contents = extract_contents_matching_path(&file_outputs, "vendor/test-library-1.1.1/BUILD");
+
+    expect(crate_build_contents.contains("rust_library("),
+      format!("expected crate build contents to contain rust_library, \
+              but it just contained [{}]", crate_build_contents)).unwrap();
+  }
+}

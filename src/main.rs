@@ -6,6 +6,10 @@ extern crate rustc_serialize;
 extern crate itertools;
 extern crate tera;
 
+#[cfg(test)]
+#[macro_use]
+extern crate hamcrest;
+
 mod context;
 mod planning;
 mod rendering;

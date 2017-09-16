@@ -21,3 +21,4 @@ serde = "1.0.11"
 [dev-dependencies]
 tempdir = "0.3.5"
 lazy_static = "0.2.8"
+hamcrest = "0.1.3"
