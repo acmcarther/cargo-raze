@@ -1,166 +1,260 @@
-#[macro_use]
+extern crate cargo as __internal_cargo_do_not_use;
+#[macro_use(Deserialize)]
 extern crate serde_derive;
 extern crate serde;
-extern crate cargo;
-extern crate rustc_serialize;
 extern crate itertools;
 extern crate tera;
+#[macro_use]
+extern crate log;
+extern crate fern;
+extern crate chrono;
+extern crate toml;
+extern crate url;
 
 #[cfg(test)]
 #[macro_use]
 extern crate hamcrest;
 
-mod context;
-mod planning;
-mod rendering;
-mod util;
-mod bazel;
-
-use bazel::BazelRenderer;
-use cargo::CargoError;
-use cargo::CliResult;
-use cargo::util::CargoResult;
-use cargo::util::Config;
-use planning::BuildPlanner;
-use rendering::FileOutputs;
-use rendering::BuildRenderer;
-use rendering::RenderDetails;
 use std::env;
 use std::fs::File;
+use std::path::Path;
+use std::path::PathBuf;
 use std::io::Write;
+use log::LogLevel;
+use util::OkButLog;
+use url::Url;
 
-#[derive(Debug, RustcDecodable)]
+mod _cargo {
+  pub use __internal_cargo_do_not_use::CargoError as Error;
+  pub use __internal_cargo_do_not_use::CliResult;
+  pub use __internal_cargo_do_not_use::call_main_without_stdin;
+  pub use __internal_cargo_do_not_use::core::Package;
+  pub use __internal_cargo_do_not_use::core::PackageIdSpec;
+  pub use __internal_cargo_do_not_use::core::Workspace;
+  pub use __internal_cargo_do_not_use::core::Summary;
+  pub use __internal_cargo_do_not_use::core::Dependency;
+  pub use __internal_cargo_do_not_use::core::dependency::Kind;
+  pub use __internal_cargo_do_not_use::core::registry::PackageRegistry;
+  pub use __internal_cargo_do_not_use::core::registry::Registry;
+  pub use __internal_cargo_do_not_use::exit_with_error;
+  pub use __internal_cargo_do_not_use::core::resolver::Method;
+  pub use __internal_cargo_do_not_use::core::resolver;
+  pub use __internal_cargo_do_not_use::ops::resolve_with_previous;
+  pub use __internal_cargo_do_not_use::util::CargoResult as CResult;
+  pub use __internal_cargo_do_not_use::util::Config;
+}
+
+#[derive(Debug, Deserialize)]
 struct Options {
-    arg_buildprefix: Option<String>,
     flag_verbose: u32,
-    flag_quiet: Option<bool>,
     flag_host: Option<String>,
     flag_color: Option<String>,
     flag_target: Option<String>,
     flag_dryrun: Option<bool>,
+    #[serde(rename = "flag_Z")]
+    flag_z: Vec<String>,
 }
 
 const USAGE: &'static str = r#"
 Generate BUILD files for your pre-vendored Cargo dependencies.
 
 Usage:
-    cargo raze [<buildprefix>] [options]
+    cargo raze [options]
 
 Options:
     -h, --help                Print this message
     -v, --verbose             Use verbose output
     --host HOST               Registry index to sync with
-    -q, --quiet               No output printed to stdout
     --color WHEN              Coloring: auto, always, never
     --target TARGET           Platform to generate BUILD files for
     -d, --dryrun              Do not emit any files
+    -Z FLAG ...                Unstable (nightly-only) flags to Cargo
 "#;
 
 fn main() {
-    let config = Config::default().unwrap();
-    let args = env::args().collect::<Vec<_>>();
-    let result = cargo::call_main_without_stdin(real_main, &config, USAGE, &args, false);
+  init::global_logger();
+  let config = _cargo::Config::default().unwrap();
+  let args = env::args().collect::<Vec<_>>();
+  let result = _cargo::call_main_without_stdin(cargo_main, &config, USAGE, &args, false);
 
-    if let Err(e) = result {
-        cargo::exit_with_error(e, &mut *config.shell());
-    }
+  if let Err(e) = result {
+      _cargo::exit_with_error(e, &mut *config.shell());
+  }
 }
 
-fn real_main(options: Options, config: &Config) -> CliResult {
+fn cargo_main(options: Options, config: &_cargo::Config) -> _cargo::CliResult {
   try!(config.configure(options.flag_verbose,
-                        options.flag_quiet,
+                        Some(false) /* quiet */,
                         &options.flag_color,
                         /* frozen = */ false,
-                        /* locked = */ false));
-  let mut planner = try!(BuildPlanner::new(
-    try!(validate_workspace_prefix(options.arg_buildprefix)),
-    options.flag_target.expect("--target flag is mandatory: try 'x86_64-unknown-linux-gnu'"),
-    config,
-  ));
+                        /* locked = */ false,
+                        &options.flag_z));
 
-  if let Some(host) = options.flag_host {
-    try!(planner.set_registry_from_url(host));
-  }
+  let current_dir = env::current_dir().unwrap();
 
-  let planned_build = try!(planner.plan_build());
-  let mut bazel_renderer = BazelRenderer::new();
-  let render_details = RenderDetails {
-    path_prefix: "./".to_owned(),
-  };
+  InitialWorkspace::load_from_fs(&config, current_dir.join(&Path::new("Cargo.toml"))).ok_but_error();
 
-  let bazel_file_outputs = try!(bazel_renderer.render_planned_build(&render_details, &planned_build));
-
-  let dry_run = options.flag_dryrun.unwrap_or(false);
-  for FileOutputs { path, contents } in bazel_file_outputs {
-    if !dry_run {
-      try!(write_to_file_loudly(&path, &contents));
-    } else {
-      println!("{}:\n{}", path, contents);
-    }
-  }
+  //debug!("{:#?}", ws);
 
   Ok(())
 }
 
-/** Verifies that the provided workspace_prefix is present and makes sense. */
-fn validate_workspace_prefix(arg_buildprefix: Option<String>) -> CargoResult<String> {
-    let workspace_prefix = try!(arg_buildprefix.ok_or(CargoError::from(
-        "build prefix must be specified (in the form //path/where/vendor/is)")));
 
-    if !(workspace_prefix.starts_with("//") || workspace_prefix.starts_with("@")) {
-        return Err(CargoError::from(
-            format!("Workspace path \"{}\" should begin with \"//\" or \"@\"", workspace_prefix)));
-    }
-
-    if workspace_prefix.ends_with("/vendor") {
-        return Err(CargoError::from(
-            format!("Workspace path \"{}\" should not end with /vendor, you probably want \"{}\"",
-                    workspace_prefix, workspace_prefix.chars().take(workspace_prefix.chars().count() - 7).collect::<String>())));
-    }
-    if workspace_prefix.ends_with("/") {
-        return Err(CargoError::from(
-            format!("Workspace path \"{}\" should not end with /, you probably want \"{}\"",
-                    workspace_prefix, workspace_prefix.chars().take(workspace_prefix.chars().count() - 1).collect::<String>())));
-    }
-
-    Ok(workspace_prefix)
+struct InitialWorkspace<'cfg> {
+  manifest_path: PathBuf,
+  raw_manifest: toml::Value,
+  cargo_workspace: _cargo::Workspace<'cfg>,
 }
 
-fn write_to_file_loudly(path: &str, contents: &str) -> CargoResult<()> {
-  try!(File::create(&path)
-     .and_then(|mut f| f.write_all(contents.as_bytes()))
-     .map_err(|_| CargoError::from(format!("failed to create {}", path))));
-  println!("Generated {} successfully", path);
-  Ok(())
+impl<'cfg>  InitialWorkspace<'cfg> {
+  fn load_from_fs(config: &_cargo::Config, manifest_path: PathBuf) -> _cargo::CResult<()> /*InitialWorkspace<'cfg>>*/ {
+    let ws = try!(_cargo::Workspace::new(&manifest_path, config));
+    let mut registry = PromotedDevDependencyRegistry {
+      inner_registry: try!(_cargo::PackageRegistry::new(&ws.config()))
+    };
+
+    let mut summaries = Vec::new();
+
+    for (url, patches) in ws.root_patch() {
+        registry.patch(url, patches)?;
+    }
+
+    for member in ws.members() {
+      let summary = registry.lock(member.summary().clone());
+      summaries.push((summary, _cargo::Method::Everything));
+    }
+
+    debug!("hello buddy");
+
+    let mut resolve = _cargo::resolver::resolve(
+                                     &summaries /* summaries */,
+                                     &[] /* replace */,
+                                     &mut registry,
+                                     Some(&ws.config()))?;
+    debug!("where did my buddy go?");
+
+    debug!("{:#?}", resolve);
+
+
+    let manifest_contents =
+      try!(util::load_file_forcefully(&manifest_path, "Cargo.toml in current working directory"));
+
+    //debug!("{:#?}", specs);
+
+    Ok(())
+
+    /*
+    InitialWorkspace {
+      manifest_path: manifest_path
+    }
+    */
+  }
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
+mod init {
+  use fern;
+  use chrono;
+  use log;
+  use std;
 
-  #[test]
-  fn test_validate_prefix_expects_some_value() {
-    assert!(validate_workspace_prefix(None).is_err());
+  pub fn global_logger() {
+    fern::Dispatch::new()
+      .format(|out, message, record| {
+          out.finish(format_args!("{} {} [{}] {}",
+              record.level(),
+              chrono::Local::now()
+                  .format("%m%d %H:%M:%S%.6f"),
+              record.target(),
+              message))
+      })
+      .level(log::LogLevelFilter::Debug)
+      .chain(std::io::stdout())
+      .apply().unwrap();
+  }
+}
+
+// TODO(acmcarther): Better Name
+struct PromotedDevDependencyRegistry<'a> {
+  inner_registry: _cargo::PackageRegistry<'a>,
+}
+
+impl <'a> PromotedDevDependencyRegistry<'a> {
+  pub fn lock(&self, summary: _cargo::Summary) -> _cargo::Summary {
+    self.inner_registry.lock(summary)
   }
 
-  #[test]
-  fn test_validate_prefix_expects_initial_slashes_or_at() {
-    assert!(validate_workspace_prefix(Some("hello".to_owned())).is_err());
-    assert!(validate_workspace_prefix(Some("@hello".to_owned())).is_ok());
-    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
+  pub fn patch(&mut self, url: &Url, deps: &[_cargo::Dependency]) -> _cargo::CResult<()> {
+    self.inner_registry.patch(url, deps)
+  }
+}
+
+impl <'a> _cargo::Registry for PromotedDevDependencyRegistry<'a> {
+  fn query(&mut self,
+           dep: &_cargo::Dependency,
+           f: &mut FnMut(_cargo::Summary)) -> _cargo::CResult<()> {
+    self.inner_registry.query(
+      dep,
+      &mut |mut summary| {
+        let summary = summary.map_dependencies(|mut dependency| {
+          if dependency.kind() == _cargo::Kind::Development {
+            dependency.set_kind(_cargo::Kind::Normal);
+          }
+          dependency
+        });
+        f(summary)
+      })
   }
 
-  #[test]
-  fn test_validate_prefix_expects_no_vendor() {
-    assert!(validate_workspace_prefix(Some("//hello/vendor".to_owned())).is_err());
-    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
+  fn query_vec(&mut self, dep: &_cargo::Dependency) -> _cargo::CResult<Vec<_cargo::Summary>> {
+    let mut ret = Vec::new();
+    self.query(dep, &mut |s| ret.push(s))?;
+    Ok(ret)
   }
 
-  #[test]
-  fn test_validate_prefix_expects_no_slash() {
-    assert!(validate_workspace_prefix(Some("//hello/".to_owned())).is_err());
-    // Vendoring into root is a really annoying edge case, not supported for now.
-    assert!(validate_workspace_prefix(Some("//".to_owned())).is_err());
-    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
+  fn supports_checksums(&self) -> bool {
+    self.inner_registry.supports_checksums()
+  }
+}
+
+mod util {
+  use log::LogLevel;
+  use std::fs::File;
+  use std::path::PathBuf;
+  use std::fmt::Display;
+  use _cargo;
+
+  pub fn load_file_forcefully(path: &PathBuf, file_description: &str) -> _cargo::CResult<String> {
+    use std::io::Read;
+
+    let mut c = String::new();
+    try!(File::open(&path)
+         .map_err(|_| "Failed to find")
+         .and_then(|mut f| f.read_to_string(&mut c).map_err(|_| "Failed to load"))
+         .map_err(|e| _cargo::Error::from(format!("{} {}", e, file_description))));
+    trace!("Successfully loaded {}", file_description);
+    Ok(c)
+  }
+
+  macro_rules! decl_ok_but {
+    ($fn_ident:ident, $log_level:expr) => (
+      fn $fn_ident(self) -> Option<T> {
+        self.ok_but($log_level)
+      }
+    )
+  }
+
+  pub trait OkButLog<T> : Sized {
+    fn ok_but(self, level: LogLevel) -> Option<T>;
+    decl_ok_but!(ok_but_error, LogLevel::Error);
+    decl_ok_but!(ok_but_warn, LogLevel::Warn);
+    decl_ok_but!(ok_but_info, LogLevel::Info);
+    decl_ok_but!(ok_but_debug, LogLevel::Debug);
+    decl_ok_but!(ok_but_trace, LogLevel::Trace);
+  }
+
+  impl <T, U : Display> OkButLog<T> for Result<T, U> {
+    fn ok_but(self, level: LogLevel) -> Option<T> {
+      self.map_err(|e| log!(level, "{}", e)).ok()
+    }
   }
 }
