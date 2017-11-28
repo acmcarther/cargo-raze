@@ -19,9 +19,6 @@ rust_library(
         "--cap-lints allow",
         "--target={{crate.platform_triple}}",
     ],
-    {% if crate.build_script %}
-    out_dir_tar = ":{{ crate.pkg_name }}_build_script_executor",
-    {% endif %}
     crate_features = [
       {% for feature in crate.features %}
       "{{feature}}",
