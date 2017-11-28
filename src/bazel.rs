@@ -21,10 +21,6 @@ impl BazelRenderer {
     renderer.add_raw_templates(vec![
       ("templates/partials/rust_binary.template", include_str!("templates/partials/rust_binary.template")),
       ("templates/partials/rust_library.template", include_str!("templates/partials/rust_library.template")),
-      ("templates/partials/rust_test.template", include_str!("templates/partials/rust_test.template")),
-      ("templates/partials/rust_bench_test.template", include_str!("templates/partials/rust_bench_test.template")),
-      ("templates/partials/rust_example.template", include_str!("templates/partials/rust_example.template")),
-      ("templates/partials/build_script.template", include_str!("templates/partials/build_script.template")),
       ("templates/workspace.BUILD.template", include_str!("templates/workspace.BUILD.template")),
       ("templates/crate.BUILD.template", include_str!("templates/crate.BUILD.template"))]).unwrap();
 
