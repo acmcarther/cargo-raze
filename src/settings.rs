@@ -2,21 +2,20 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CargoToml {
+  /** The raze settings (the only part of the Cargo.toml we care about. */
   pub raze: RazeSettings,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RazeSettings {
-  #[serde(default = "default_vendor_path")]
-  pub vendor_path: String,
+  /** The path to the Cargo.toml working directory. */
+  pub workspace_path: String,
+  /** The target to generate BUILD rules for. */
   #[serde(default = "default_target")]
   pub target: String,
+  /** Any crate-specific configuration. */
   #[serde(default)]
   pub crates: HashMap<String, HashMap<String, CrateSettings>>
-}
-
-fn default_vendor_path() -> String {
-  "//".to_owned()
 }
 
 fn default_target() -> String {
@@ -25,8 +24,10 @@ fn default_target() -> String {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CrateSettings {
+  /** Dependencies to be added to a crate, in the form "//etc".*/
   #[serde(default)]
   additional_deps: Vec<String>,
+  /** Flags to be added to the crate compilation process, in the form "--flag". */
   #[serde(default)]
   additional_flags: Vec<String>,
 }

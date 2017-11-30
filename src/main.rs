@@ -110,12 +110,16 @@ fn real_main(options: Options, cargo_config: &Config) -> CliResult {
 
 /** Verifies that the provided settings make sense. */
 fn validate_settings(settings: &mut RazeSettings) -> CargoResult<()> {
-  if !settings.vendor_path.starts_with("//") {
-    return Err(CargoError::from("raze.vendor_path must start with \"//\". Paths into local repositories (such as @local//path) are currently unsupported."))
+  if !settings.workspace_path.starts_with("//") {
+    return Err(CargoError::from("raze.workspace_path must start with \"//\". Paths into local repositories (such as @local//path) are currently unsupported."))
   }
 
-  if settings.vendor_path.ends_with("/") && settings.vendor_path != "//" {
-    settings.vendor_path.pop();
+  if settings.workspace_path == "//" {
+    return Err(CargoError::from("raze.workspace_path must not be '//' (it is currently unsupported). Its probably not what you want anyway, as this would vendor the crates directly into //vendor."));
+  }
+
+  if settings.workspace_path.ends_with("/") {
+    settings.workspace_path.pop();
   }
 
   return Ok(())
@@ -149,36 +153,4 @@ fn load_settings<T: AsRef<Path>>(cargo_toml_path: T) -> Result<RazeSettings, Car
       CargoError::from(format!("failed to parse {:?}", path))
     })
     .map(|toml| toml.raze)
-}
-
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_validate_prefix_expects_some_value() {
-    assert!(validate_workspace_prefix(None).is_err());
-  }
-
-  #[test]
-  fn test_validate_prefix_expects_initial_slashes_or_at() {
-    assert!(validate_workspace_prefix(Some("hello".to_owned())).is_err());
-    assert!(validate_workspace_prefix(Some("@hello".to_owned())).is_ok());
-    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
-  }
-
-  #[test]
-  fn test_validate_prefix_expects_no_vendor() {
-    assert!(validate_workspace_prefix(Some("//hello/vendor".to_owned())).is_err());
-    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
-  }
-
-  #[test]
-  fn test_validate_prefix_expects_no_slash() {
-    assert!(validate_workspace_prefix(Some("//hello/".to_owned())).is_err());
-    // Vendoring into root is a really annoying edge case, not supported for now.
-    assert!(validate_workspace_prefix(Some("//".to_owned())).is_err());
-    assert!(validate_workspace_prefix(Some("//hello".to_owned())).is_ok());
-  }
 }
