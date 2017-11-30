@@ -31,6 +31,8 @@ pub struct CrateContext {
   pub platform_triple: String,
   pub targets: Vec<BuildTarget>,
   pub build_script_target: Option<BuildTarget>,
+  pub additional_deps: Vec<String>,
+  pub additional_flags: Vec<String>,
   // TODO(acmcarther): Consider plugin topic
 }
 

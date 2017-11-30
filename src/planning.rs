@@ -101,6 +101,18 @@ impl <'a>  BuildPlanner<'a> {
           let targets_sans_build_script =
             targets.into_iter().filter(|t| t.kind.deref() != "custom-build").collect::<Vec<_>>();
 
+          let possible_crate_settings =
+            self.settings.crates
+              .get(id.name())
+              .and_then(|c| c.get(&id.version().to_string()));
+
+          let additional_deps =
+            possible_crate_settings.map(|s| s.additional_deps.clone()).unwrap_or(Vec::new());
+
+          let additional_flags =
+            possible_crate_settings.map(|s| s.additional_flags.clone()).unwrap_or(Vec::new());
+
+
           crate_contexts.push(CrateContext {
               pkg_name: id.name().to_owned(),
               pkg_version: id.version().to_string(),
@@ -114,6 +126,8 @@ impl <'a>  BuildPlanner<'a> {
               build_script_target: build_script_target,
               targets: targets_sans_build_script,
               platform_triple: self.settings.target.to_owned(),
+              additional_deps: additional_deps,
+              additional_flags: additional_flags,
           });
       }
 

@@ -11,17 +11,23 @@ rust_library(
     crate_root = "{{ target.path }}",
     srcs = glob(["**/*.rs"]),
     deps = [
-    {% for dependency in crate.dependencies %}
+        {% for dependency in crate.dependencies %}
         "{{path_prefix}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace(from="-", to="_") }}",
-    {% endfor %}
+        {% endfor %}
+        {% for dependency in crate.additional_deps %}
+        "{{dependency}}"
+        {% endfor %}
     ],
     rustc_flags = [
         "--cap-lints allow",
         "--target={{crate.platform_triple}}",
+        {% for flag in crate.additional_flags %}
+        "{{flag}}"
+        {% endfor %}
     ],
     crate_features = [
-      {% for feature in crate.features %}
-      "{{feature}}",
-      {% endfor %}
+        {% for feature in crate.features %}
+        "{{feature}}",
+        {% endfor %}
     ],
 )

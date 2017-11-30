@@ -26,8 +26,8 @@ fn default_target() -> String {
 pub struct CrateSettings {
   /** Dependencies to be added to a crate, in the form "//etc".*/
   #[serde(default)]
-  additional_deps: Vec<String>,
+  pub additional_deps: Vec<String>,
   /** Flags to be added to the crate compilation process, in the form "--flag". */
   #[serde(default)]
-  additional_flags: Vec<String>,
+  pub additional_flags: Vec<String>,
 }
