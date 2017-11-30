@@ -15,14 +15,14 @@ rust_library(
         "{{path_prefix}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace(from="-", to="_") }}",
         {% endfor %}
         {% for dependency in crate.additional_deps %}
-        "{{dependency}}"
+        "{{dependency}}",
         {% endfor %}
     ],
     rustc_flags = [
         "--cap-lints allow",
         "--target={{crate.platform_triple}}",
         {% for flag in crate.additional_flags %}
-        "{{flag}}"
+        "{{flag}}",
         {% endfor %}
     ],
     crate_features = [
