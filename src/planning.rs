@@ -17,6 +17,7 @@ use context::BuildDependency;
 use context::BuildTarget;
 use context::CrateContext;
 use context::WorkspaceContext;
+use settings::RazeSettings;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -31,21 +32,20 @@ pub struct PlannedBuild {
 }
 
 pub struct BuildPlanner<'a> {
-  workspace_prefix: String,
-  platform_triple: String,
-  config: &'a Config,
+  settings: RazeSettings,
+  cargo_config: &'a Config,
   platform_attrs: Vec<Cfg>,
   registry: Option<SourceId>,
 }
 
 impl <'a>  BuildPlanner<'a> {
-  pub fn new(workspace_prefix: String, platform_triple: String, config: &'a Config) -> CargoResult<BuildPlanner<'a>> {
+  pub fn new(settings: RazeSettings,
+             cargo_config: &'a Config) -> CargoResult<BuildPlanner<'a>> {
     Ok(BuildPlanner {
-      workspace_prefix: workspace_prefix,
-      platform_attrs: try!(util::fetch_attrs(&platform_triple)),
-      platform_triple: platform_triple,
-      config: config,
+      platform_attrs: try!(util::fetch_attrs(&settings.target)),
+      cargo_config: cargo_config,
       registry: None,
+      settings: settings,
     })
   }
 
@@ -61,7 +61,7 @@ impl <'a>  BuildPlanner<'a> {
 
   pub fn plan_build(&self) -> CargoResult<PlannedBuild> {
       let ResolvedPlan {root_name, packages, resolve} =
-          try!(ResolvedPlan::resolve_from_files(&self.config));
+          try!(ResolvedPlan::resolve_from_files(&self.cargo_config));
 
       let root_package_id = try!(resolve.iter()
           .filter(|dep| dep.name() == root_name)
@@ -73,7 +73,7 @@ impl <'a>  BuildPlanner<'a> {
 
       let source_id = match self.registry.clone() {
         Some(v) => v,
-        None => try!(SourceId::crates_io(&self.config)),
+        None => try!(SourceId::crates_io(&self.cargo_config)),
       };
 
       for id in try!(find_all_package_ids(source_id, &resolve)) {
@@ -90,7 +90,7 @@ impl <'a>  BuildPlanner<'a> {
 
           // Identify all possible dependencies
           let PlannedDeps { mut build_deps, mut dev_deps, mut normal_deps } =
-              PlannedDeps::find_all_deps(&id, &package, &resolve, &self.platform_triple, &self.platform_attrs);
+              PlannedDeps::find_all_deps(&id, &package, &resolve, &self.settings.target, &self.platform_attrs);
           build_deps.sort();
           dev_deps.sort();
           normal_deps.sort();
@@ -113,13 +113,13 @@ impl <'a>  BuildPlanner<'a> {
               path: path,
               build_script_target: build_script_target,
               targets: targets_sans_build_script,
-              platform_triple: self.platform_triple.to_owned(),
+              platform_triple: self.settings.target.to_owned(),
           });
       }
 
       let workspace_context = WorkspaceContext {
-        workspace_prefix: self.workspace_prefix.clone(),
-        platform_triple: self.platform_triple.clone(),
+        workspace_prefix: self.settings.vendor_path.clone(),
+        platform_triple: self.settings.target.clone(),
       };
       Ok(PlannedBuild{
         workspace_context: workspace_context,
@@ -188,11 +188,11 @@ impl<'a> ResolvedPlan<'a> {
      * Performs Cargo's own build plan resolution, yielding the root crate, the set of packages, and
      * the resolution graph.
      */
-    pub fn resolve_from_files(config: &Config) -> CargoResult<ResolvedPlan> {
+    pub fn resolve_from_files(cargo_config: &Config) -> CargoResult<ResolvedPlan> {
         let lockfile = Path::new("Cargo.lock");
         let manifest_path = lockfile.parent().unwrap().join("Cargo.toml");
         let manifest = env::current_dir().unwrap().join(&manifest_path);
-        let ws = try!(Workspace::new(&manifest, config));
+        let ws = try!(Workspace::new(&manifest, cargo_config));
         let specs = Packages::All.into_package_id_specs(&ws)?;
         let root_name = specs.iter().next().unwrap().name().to_owned();
 
