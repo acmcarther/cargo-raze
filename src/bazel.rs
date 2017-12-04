@@ -19,6 +19,7 @@ impl BazelRenderer {
     // Configure tera with a bogus template dir: We don't want any runtime template support
     let mut renderer = Tera::new("src/not/a/dir/*").unwrap();
     renderer.add_raw_templates(vec![
+      ("templates/partials/build_script.template", include_str!("templates/partials/build_script.template")),
       ("templates/partials/rust_binary.template", include_str!("templates/partials/rust_binary.template")),
       ("templates/partials/rust_library.template", include_str!("templates/partials/rust_library.template")),
       ("templates/workspace.BUILD.template", include_str!("templates/workspace.BUILD.template")),

@@ -30,4 +30,11 @@ pub struct CrateSettings {
   /** Flags to be added to the crate compilation process, in the form "--flag". */
   #[serde(default)]
   pub additional_flags: Vec<String>,
+
+  #[serde(default = "default_gen_buildrs")]
+  pub gen_buildrs: bool,
+}
+
+fn default_gen_buildrs() -> bool {
+  false
 }

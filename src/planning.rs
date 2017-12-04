@@ -97,14 +97,23 @@ impl <'a>  BuildPlanner<'a> {
 
           let mut targets = try!(identify_targets(&full_name, &package));
           targets.sort();
-          let build_script_target = targets.iter().find(|t| t.kind.deref() == "custom-build").cloned();
-          let targets_sans_build_script =
-            targets.into_iter().filter(|t| t.kind.deref() != "custom-build").collect::<Vec<_>>();
 
           let possible_crate_settings =
             self.settings.crates
               .get(id.name())
               .and_then(|c| c.get(&id.version().to_string()));
+
+          let should_gen_buildrs =
+            possible_crate_settings.map(|s| s.gen_buildrs.clone()).unwrap_or(false);
+          let build_script_target = if should_gen_buildrs {
+            targets.iter().find(|t| t.kind.deref() == "custom-build").cloned()
+          } else {
+            None
+          };
+
+          let targets_sans_build_script =
+            targets.into_iter().filter(|t| t.kind.deref() != "custom-build").collect::<Vec<_>>();
+
 
           let additional_deps =
             possible_crate_settings.map(|s| s.additional_deps.clone()).unwrap_or(Vec::new());
