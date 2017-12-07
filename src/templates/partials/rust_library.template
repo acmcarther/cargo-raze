@@ -9,6 +9,7 @@ alias(
 rust_library(
     name = "{{ target_name_sanitized }}",
     crate_root = "{{ target.path }}",
+    crate_type = "{{ target.kind }}",
     srcs = glob(["**/*.rs"]),
     deps = [
         {% for dependency in crate.dependencies %}
