@@ -28,15 +28,9 @@ So far you've either stuck with Cargo and made do with `build.rs` files, or migr
 In your Bazel WORKSPACE:
 ```python
 git_repository(
-    name = "io_bazel_rules_raze",
-    remote = "https://github.com/acmcarther/cargo-raze.git",
-    commit = "c84e361"
-)
-
-git_repository(
     name = "io_bazel_rules_rust",
+    commit = "5b94fdb",
     remote = "https://github.com/acmcarther/rules_rust.git",
-    commit = "49a7345"
 )
 load("@io_bazel_rules_rust//rust:rust.bzl", "rust_repositories")
 
@@ -49,9 +43,9 @@ cargo install cargo-vendor
 cargo install cargo-raze
 cargo generate-lockfile
 cargo vendor -x
-cargo raze "//path/to/vendor"
+cargo raze
 ```
-You dependencies each get a shiny new `Cargo.bzl` file that bazel can use to link your dependencies up. You will also get starter BUILD files that reference those .bzl files.
+You dependencies each get a shiny new `BUILD` file that bazel can use to link your dependencies up.
 
 See my hobby project [space_coop](https://github.com/acmcarther/next_space_coop) for a real life example.
 
