@@ -4,8 +4,6 @@
 
 A cargo subcommand to generate platform-specific BUILD files.
 
-Also, a bazel ruleset for using the outputs of that cargo subcommand.
-
 See examples in the automatically updated examples repository:
 [github.com/acmcarther/cargo-raze-examples](https://github.com/acmcarther/cargo-raze-examples)
 
@@ -25,48 +23,57 @@ So far you've either stuck with Cargo and made do with `build.rs` files, or migr
 
 ## Getting Started
 
-In your Bazel WORKSPACE:
+In your Bazel WORKSPACE, include the rust rules:
 ```python
 git_repository(
     name = "io_bazel_rules_rust",
     commit = "5b94fdb",
     remote = "https://github.com/acmcarther/rules_rust.git",
 )
-load("@io_bazel_rules_rust//rust:rust.bzl", "rust_repositories")
+load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
 
 rust_repositories()
 ```
 
-Then, in a directory containing 'Cargo.toml'. Project root is fine:
+Create a `Cargo.toml` containing the crates you want to include and configuration for raze:
+```toml
+[package]
+name = "compile_with_bazel"
+version = "0.1.0"
+
+[dependencies]
+log = "0.3.6"
+
+[raze]
+workspace_path = "//label/for/vendored/crates" # The WORKSPACE relative path to the Cargo.toml working directory. 
+target = "x86_64-unknown-linux-gnu" # The target to generate BUILD rules for.
 ```
+
+Then, in the directory containing the `Cargo.toml`. Project root is fine:
+```bash
 cargo install cargo-vendor
 cargo install cargo-raze
 cargo generate-lockfile
 cargo vendor -x
 cargo raze
 ```
-You dependencies each get a shiny new `BUILD` file that bazel can use to link your dependencies up.
+Your dependencies each get a shiny new `BUILD` file that bazel can use to link your dependencies up.
 
-See my hobby project [space_coop](https://github.com/acmcarther/next_space_coop) for a real life example.
+See my hobby project [space_coop](https://github.com/acmcarther/next_space_coop) for a real life example, with its raze Cargo.toml [here](https://github.com/acmcarther/next_space_coop/blob/master/cargo/Cargo.toml).
 
-## Project Structure
+## Additional Configuration
 
-This repo is a hybrid cargo crate + Bazel Skylark ruleset. The project is structured roughly as follows:
+Sometimes it's necessary to change the way a crate is built, generally to provide a native library or provide configuration.
 
-cargo-raze crate:
-- ./Cargo.toml
-- ./Cargo.lock
-- ./src/
+See these examples of providing crate configuration:
 
-rules_raze:
-- ./WORKSPACE
-- ./examples/
-- ./raze/
-
+- [basic-example](https://github.com/acmcarther/cargo-raze-examples/blob/master/bazel/hello_cargo_library/Cargo.toml)
+- [complicated-example](https://github.com/acmcarther/cargo-raze-examples/blob/master/bazel/complicated_cargo_library/Cargo.toml)
+- [openssl-example](https://github.com/acmcarther/compile_openssl/blob/master/cargo/Cargo.toml)
 
 ## TODO:
 
-- Proper platform detection. Currently we just use generic linux. This isn't too hard, just haven't had time.
-- Platform-agnostic generated `Cargo.bzl`. I envision mapping the existing platform-specific dependency support down to a handful of supported platforms within the bazel rule, rather than here. That lets us use bazel's `select` construct to support multiple platforms with a single rule.
+- Proper platform detection. Currently we take platform as a configuration parameter. This isn't too hard, just haven't had time.
+- Platform-agnostic generated `BUILD`. I envision mapping the existing platform-specific dependency support down to a handful of supported platforms within the bazel rule, rather than here. That lets us use bazel's `select` construct to support multiple platforms with a single rule.
 - Clean up folder structure
 - Set up dual compilation (compile raze via bazel OR via cargo). Prereq: openssl. Openssl is major pain to compile.
