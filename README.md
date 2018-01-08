@@ -7,9 +7,9 @@ A cargo subcommand to generate platform-specific BUILD files.
 See examples in the automatically updated examples repository:
 [github.com/acmcarther/cargo-raze-examples](https://github.com/acmcarther/cargo-raze-examples)
 
-## WARNING!!!
+## Caution: Under Development!
 
-This is still under heavy development. It has few tests and is very unstable. Please do not use it in a production environment! It relies on some custom changes to the [rules_rust](https://github.com/bazel/rules_rust) library to support build scripts and duplicate crate definitions. The changes are available in the [diff between my repo and master](https://github.com/bazelbuild/rules_rust/compare/master...acmcarther:acm-06-17-hotfixes).
+This is still under heavy development. It has few tests and is very unstable. It relies on some custom changes to the [rules_rust](https://github.com/bazel/rules_rust) library to support build scripts and duplicate crate definitions. The changes are available in the [diff between my repo and master](https://github.com/bazelbuild/rules_rust/compare/master...acmcarther:acm-06-17-hotfixes).
 
 If you'd like to use it anyway, you are definitely welcome to. Please direct any questions to acmcarther@: your input would be very helpful to guide development
 
