@@ -112,6 +112,7 @@ mod tests {
       build_script_target: None,
       additional_deps: Vec::new(),
       additional_flags: Vec::new(),
+      extra_aliased_targets: Vec::new(),
     }
   }
 
@@ -137,6 +138,7 @@ mod tests {
       build_script_target: None,
       additional_deps: Vec::new(),
       additional_flags: Vec::new(),
+      extra_aliased_targets: Vec::new(),
     }
   }
 
