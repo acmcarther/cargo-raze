@@ -114,13 +114,24 @@ impl <'a>  BuildPlanner<'a> {
           let targets_sans_build_script =
             targets.into_iter().filter(|t| t.kind.deref() != "custom-build").collect::<Vec<_>>();
 
-
           let additional_deps =
             possible_crate_settings.map(|s| s.additional_deps.clone()).unwrap_or(Vec::new());
 
           let additional_flags =
             possible_crate_settings.map(|s| s.additional_flags.clone()).unwrap_or(Vec::new());
 
+          let extra_aliased_targets =
+            possible_crate_settings.map(|s| s.extra_aliased_targets.clone()).unwrap_or(Vec::new());
+
+          // Skip generated dependencies explicitly designated to be skipped (potentially due to
+          // being replaced or customized as part of additional_deps)
+          let non_skipped_normal_deps = if let Some(s) = possible_crate_settings {
+            normal_deps.into_iter()
+              .filter(|d| !s.skipped_deps.contains(&format!("{}-{}", d.name, d.version)))
+              .collect::<Vec<_>>()
+          } else {
+            normal_deps
+          };
 
           crate_contexts.push(CrateContext {
               pkg_name: id.name().to_owned(),
@@ -128,7 +139,7 @@ impl <'a>  BuildPlanner<'a> {
               features: features,
               is_root_dependency: root_direct_deps.contains(&id),
               metadeps: Vec::new() /* TODO(acmcarther) */,
-              dependencies: normal_deps,
+              dependencies: non_skipped_normal_deps,
               build_dependencies: build_deps,
               dev_dependencies: dev_deps,
               path: path,
@@ -137,7 +148,8 @@ impl <'a>  BuildPlanner<'a> {
               platform_triple: self.settings.target.to_owned(),
               additional_deps: additional_deps,
               additional_flags: additional_flags,
-          });
+              extra_aliased_targets: extra_aliased_targets,
+          })
       }
 
       let workspace_context = WorkspaceContext {

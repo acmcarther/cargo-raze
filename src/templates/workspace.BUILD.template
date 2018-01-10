@@ -13,4 +13,12 @@ alias(
     actual = "{{path_prefix}}/vendor/{{crate.pkg_name}}-{{crate.pkg_version}}:{{crate_name_sanitized}}",
 )
 {% endif %}
+{% for aliased_target in crate.extra_aliased_targets %}
+alias(
+    # Extra aliased target, from raze configuration
+    # N.B.: The exact form of this is subject to change.
+    name = "{{aliased_target}}",
+    actual = "{{path_prefix}}/vendor/{{crate.pkg_name}}-{{crate.pkg_version}}:{{aliased_target}}",
+)
+{% endfor %}
 {% endfor %}
