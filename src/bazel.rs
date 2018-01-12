@@ -20,10 +20,16 @@ impl BazelRenderer {
     let mut renderer = Tera::new("src/not/a/dir/*").unwrap();
     renderer.add_raw_templates(vec![
       ("templates/partials/build_script.template", include_str!("templates/partials/build_script.template")),
+      ("templates/partials/remote_build_script.template", include_str!("templates/partials/remote_build_script.template")),
       ("templates/partials/rust_binary.template", include_str!("templates/partials/rust_binary.template")),
+      ("templates/partials/remote_rust_binary.template", include_str!("templates/partials/remote_rust_binary.template")),
       ("templates/partials/rust_library.template", include_str!("templates/partials/rust_library.template")),
+      ("templates/partials/remote_rust_library.template", include_str!("templates/partials/remote_rust_library.template")),
       ("templates/workspace.BUILD.template", include_str!("templates/workspace.BUILD.template")),
-      ("templates/crate.BUILD.template", include_str!("templates/crate.BUILD.template"))]).unwrap();
+      ("templates/remote_workspace.BUILD.template", include_str!("templates/remote_workspace.BUILD.template")),
+      ("templates/crate.BUILD.template", include_str!("templates/crate.BUILD.template")),
+      ("templates/remote_crates.bzl.template", include_str!("templates/remote_crates.bzl.template")),
+      ("templates/remote_crate.BUILD.template", include_str!("templates/remote_crate.BUILD.template"))]).unwrap();
 
     BazelRenderer {
       internal_renderer: renderer,
@@ -43,6 +49,27 @@ impl BazelRenderer {
     context.add("crates", &all_packages);
     self.internal_renderer.render("templates/workspace.BUILD.template", &context)
   }
+
+  pub fn render_remote_crate(&self, workspace_context: &WorkspaceContext, package: &CrateContext) -> Result<String, tera::Error> {
+    let mut context = Context::new();
+    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("crate", &package);
+    self.internal_renderer.render("templates/remote_crate.BUILD.template", &context)
+  }
+
+  pub fn render_remote_aliases(&self, workspace_context: &WorkspaceContext, all_packages: &Vec<CrateContext>) -> Result<String, tera::Error> {
+    let mut context = Context::new();
+    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("crates", &all_packages);
+    self.internal_renderer.render("templates/remote_workspace.BUILD.template", &context)
+  }
+
+  pub fn render_bzl_fetch(&self, workspace_context: &WorkspaceContext, all_packages: &Vec<CrateContext>) -> Result<String, tera::Error> {
+    let mut context = Context::new();
+    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("crates", &all_packages);
+    self.internal_renderer.render("templates/remote_crates.bzl.template", &context)
+  }
 }
 
 impl BuildRenderer for BazelRenderer {
@@ -60,6 +87,28 @@ impl BuildRenderer for BazelRenderer {
     let build_file_path = format!("{}/vendor/BUILD", &path_prefix);
     let rendered_alias_build_file = try!(self.render_aliases(&workspace_context, &crate_contexts).map_err(|e| CargoError::from(e.to_string())));
     file_outputs.push(FileOutputs { path: build_file_path, contents: rendered_alias_build_file });
+    Ok(file_outputs)
+  }
+
+  fn render_remote_planned_build(&mut self, render_details: &RenderDetails, planned_build: &PlannedBuild) -> CargoResult<Vec<FileOutputs>> {
+    let &RenderDetails { ref path_prefix, .. } = render_details;
+    let &PlannedBuild { ref workspace_context, ref crate_contexts, .. } = planned_build;
+    let mut file_outputs = Vec::new();
+
+    for package in crate_contexts {
+      let build_file_path = format!("{}-{}.BUILD", &package.pkg_name, &package.pkg_version);
+      let rendered_crate_build_file = try!(self.render_remote_crate(&workspace_context, &package).map_err(|e| CargoError::from(e.to_string())));
+      file_outputs.push(FileOutputs { path: build_file_path, contents: rendered_crate_build_file })
+    }
+
+    let alias_file_path = format!("{}/BUILD", &path_prefix);
+    let rendered_alias_build_file = try!(self.render_remote_aliases(&workspace_context, &crate_contexts).map_err(|e| CargoError::from(e.to_string())));
+    file_outputs.push(FileOutputs { path: alias_file_path, contents: rendered_alias_build_file });
+
+    let bzl_fetch_file_path = format!("{}/crates.bzl", &path_prefix);
+    let rendered_bzl_fetch_file = try!(self.render_bzl_fetch(&workspace_context, &crate_contexts).map_err(|e| CargoError::from(e.to_string())));
+    file_outputs.push(FileOutputs { path: bzl_fetch_file_path, contents: rendered_bzl_fetch_file });
+
     Ok(file_outputs)
   }
 }

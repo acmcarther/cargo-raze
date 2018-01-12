@@ -1,0 +1,15 @@
+"""
+cargo-raze crate workspace functions
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+def fetch_remote_crates():
+{% for crate in crates %}
+    native.new_http_archive(
+        name = "{{crate.pkg_name | slugify | replace(from="-", to="_")}}{{crate.pkg_version | slugify | replace(from="-", to="_")}}",
+        url = "https://crates-io.s3-us-west-1.amazonaws.com/crates/{{crate.pkg_name}}/{{crate.pkg_name}}-{{crate.pkg_version}}.crate",
+        type = "tar.gz",
+        strip_prefix = "{{crate.pkg_name}}-{{crate.pkg_version}}",
+        build_file = "{{path_prefix}}:{{crate.pkg_name}}-{{crate.pkg_version}}.BUILD")
+{% endfor %}

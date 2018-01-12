@@ -94,7 +94,8 @@ fn real_main(options: Options, cargo_config: &Config) -> CliResult {
     path_prefix: "./".to_owned(),
   };
 
-  let bazel_file_outputs = try!(bazel_renderer.render_planned_build(&render_details, &planned_build));
+  //let bazel_file_outputs = try!(bazel_renderer.render_planned_build(&render_details, &planned_build));
+  let bazel_file_outputs = try!(bazel_renderer.render_remote_planned_build(&render_details, &planned_build));
 
   let dry_run = options.flag_dryrun.unwrap_or(false);
   for FileOutputs { path, contents } in bazel_file_outputs {

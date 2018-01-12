@@ -84,9 +84,10 @@ impl <'a>  BuildPlanner<'a> {
           let path = format!("./vendor/{}-{}/", id.name(), id.version());
 
           // Verify that package is really vendored
+          /*
           try!(fs::metadata(&path).map_err(|_| {
               CargoError::from(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
-          }));
+          }));*/
 
           // Identify all possible dependencies
           let PlannedDeps { mut build_deps, mut dev_deps, mut normal_deps } =
