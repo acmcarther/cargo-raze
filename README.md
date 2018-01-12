@@ -35,11 +35,17 @@ load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
 rust_repositories()
 ```
 
+Now, choose between vendoring (checking dependencies into repo) or not vendoring
+
+### Vendoring dependencies locally (default)
 Create a `Cargo.toml` containing the crates you want to include and configuration for raze:
 ```toml
 [package]
 name = "compile_with_bazel"
 version = "0.1.0"
+
+[lib]
+path = "fake_lib.rs"
 
 [dependencies]
 log = "0.3.6"
@@ -59,7 +65,44 @@ cargo raze
 ```
 Your dependencies each get a shiny new `BUILD` file that bazel can use to link your dependencies up.
 
-See my hobby project [space_coop](https://github.com/acmcarther/next_space_coop) for a real life example, with its raze Cargo.toml [here](https://github.com/acmcarther/next_space_coop/blob/master/cargo/Cargo.toml).
+### Remote dependencies
+Create a `Cargo.toml` containing the crates you want to include and configuration for raze:
+```toml
+[package]
+name = "compile_with_bazel"
+version = "0.1.0"
+
+[lib]
+path = "fake_lib.rs"
+
+[dependencies]
+log = "0.3.6"
+
+[raze]
+workspace_path = "//label/for/vendored/crates" # The WORKSPACE relative path to the Cargo.toml working directory. 
+target = "x86_64-unknown-linux-gnu" # The target to generate BUILD rules for.
+genmode = "Remote" # Have Bazel pull the dependencies down
+```
+
+Then, in the directory containing the `Cargo.toml`. Project root is fine:
+```bash
+cargo install cargo-raze
+cargo raze
+```
+You now have three files: A "crates.bzl" file with a repository function to pull
+down your deps, a BUILD file that references your explicit dependencies, and a
+set of dep build files for each of your dependencies.
+
+In order for Bazel to know about the dependencies, you need to execute the
+repository function provided in "crates.bzl". To do that, add a snippet as
+follows:
+
+```python
+load("//label/for/vendored/crates:crates.bzl", "raze_fetch_remote_crates")
+
+raze_fetch_remote_crates()
+```
+
 
 ## Additional Configuration
 

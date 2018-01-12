@@ -29,11 +29,14 @@ pub struct RazeSettings {
   /** The path to the Cargo.toml working directory. */
   pub workspace_path: String,
 
-  /** The target to generate BUILD rules for. */
+  /** The platform target to generate BUILD rules for.
+   *
+   * This comes in the form of a "triple", such as "x86_64-unknown-linux-gnu"
+   */
   #[serde(default = "default_target")]
   pub target: String,
 
-  /** Any crate-specific configuration. */
+  /** Any crate-specific configuration. See CrateSetings for details. */
   #[serde(default)]
   pub crates: HashMap<String, HashMap<String, CrateSettings>>,
 
@@ -69,7 +72,7 @@ pub struct CrateSettings {
   /**
    * Dependencies to be added to a crate.
    *
-   * Importantly, the format of dependency references depends on the gen mode.
+   * Importantly, the format of dependency references depends on the genmode.
    * Remote: @{gen_workspace_prefix}__{dep_name}__{dep_version_sanitized}/:{dep_name}
    * Vendored: //{workspace_path}/vendor/{dep_name}-{dep_version}:{dep_name}
    *
@@ -106,7 +109,7 @@ pub struct CrateSettings {
    * Whether or not to generate the build script that goes with this crate.
    *
    * Many build scripts will not function, as they will still be built hermetically. However, build
-   * scripts that merely generate files into OUT_DIR may be functional.
+   * scripts that merely generate files into OUT_DIR may be fully functional.
    */
   #[serde(default = "default_gen_buildrs")]
   pub gen_buildrs: bool,

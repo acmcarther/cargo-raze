@@ -1,27 +1,27 @@
 rust_binary(
     name = "{{ crate_name_sanitized }}_build_script",
     srcs = glob(["**/*.rs"]),
-    {% if crate.build_script_target.path %}
+    {%- if crate.build_script_target.path %}
     crate_root = "{{ crate.build_script_target.path }}",
-    {% else %}
+    {%- else %}
     crate_root = "build.rs",
-    {% endif %}
+    {%- endif %}
     data = glob([
       "*"
     ]),
     deps = [
-      {% for dependency in crate.build_dependencies %}
+      {%- for dependency in crate.build_dependencies %}
         "{{workspace.workspace_path}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace(from="-", to="_") }}",
-      {% endfor %}
+      {%- endfor %}
     ],
     rustc_flags = [
         "--cap-lints allow",
         "--target={{crate.platform_triple}}",
     ],
     crate_features = [
-      {% for feature in crate.features %}
+      {%- for feature in crate.features %}
       "{{feature}}",
-      {% endfor %}
+      {%- endfor %}
     ],
     visibility = ["//visibility:private"],
 )
@@ -36,9 +36,9 @@ genrule(
         + " (export CARGO_MANIFEST_DIR=\"$$PWD/{{ workspace.workspace_path | replace(from="//", to="") }}/vendor/{{ crate.pkg_name }}-{{ crate.pkg_version }}\";"
         + " export TARGET='{{ crate.platform_triple }}';"
         + " export RUST_BACKTRACE=1;"
-        {% for feature in crate.features %}
+        {%- for feature in crate.features %}
         + " export CARGO_FEATURE_{{ feature | upper | replace(from="-", to="_") }}=1;"
-        {% endfor %}
+        {%- endfor %}
         + " export OUT_DIR=$$PWD/{{ crate_name_sanitized }}_out_dir_outputs;"
         + " export BINARY_PATH=\"$$PWD/$(location :{{ crate_name_sanitized }}_build_script)\";"
         + " export OUT_TAR=$$PWD/$@;"
