@@ -95,14 +95,13 @@ set of dep build files for each of your dependencies.
 
 In order for Bazel to know about the dependencies, you need to execute the
 repository function provided in "crates.bzl". To do that, add a snippet as
-follows:
+follows to your root WORKSPACE file.
 
 ```python
 load("//label/for/vendored/crates:crates.bzl", "raze_fetch_remote_crates")
 
 raze_fetch_remote_crates()
 ```
-
 
 ## Additional Configuration
 
@@ -113,6 +112,8 @@ See these examples of providing crate configuration:
 - [basic-example](https://github.com/acmcarther/cargo-raze-examples/blob/master/bazel/hello_cargo_library/Cargo.toml)
 - [complicated-example](https://github.com/acmcarther/cargo-raze-examples/blob/master/bazel/complicated_cargo_library/Cargo.toml)
 - [openssl-example](https://github.com/acmcarther/compile_openssl/blob/master/cargo/Cargo.toml)
+
+The [raze] section is derived from a struct declared in [src/settings.rs](./src/settings.rs).
 
 ## TODO:
 

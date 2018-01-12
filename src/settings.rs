@@ -43,7 +43,9 @@ pub struct RazeSettings {
   /**
    * Prefix for generated Bazel workspaces (from workspace_rules)
    *
-   * This is only useful with remote genmode.
+   * This is only useful with remote genmode. It prefixes the names of the workspaces for
+   * dependencies (@PREFIX_crateName_crateVersion) as well as the name of the repository function
+   * generated in crates.bzl (PREFIX_fetch_remote_crates()).
    *
    * TODO(acmcarther): Does this have a non-bazel analogue?
    */
