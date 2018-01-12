@@ -154,8 +154,9 @@ impl <'a>  BuildPlanner<'a> {
       }
 
       let workspace_context = WorkspaceContext {
-        workspace_prefix: self.settings.workspace_path.clone(),
+        workspace_path: self.settings.workspace_path.clone(),
         platform_triple: self.settings.target.clone(),
+        gen_workspace_prefix: self.settings.gen_workspace_prefix.clone(),
       };
       Ok(PlannedBuild{
         workspace_context: workspace_context,

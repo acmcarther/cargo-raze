@@ -39,6 +39,10 @@ pub struct CrateContext {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct WorkspaceContext {
-  pub workspace_prefix: String,
+  /** The bazel path prefix to the vendor directory */
+  pub workspace_path: String,
+  /** The compilation target triple */
   pub platform_triple: String,
+  /** The generated new_http_library Bazel workspace prefix */
+  pub gen_workspace_prefix: String
 }

@@ -15,11 +15,23 @@ pub struct RazeSettings {
   pub target: String,
   /** Any crate-specific configuration. */
   #[serde(default)]
-  pub crates: HashMap<String, HashMap<String, CrateSettings>>
+  pub crates: HashMap<String, HashMap<String, CrateSettings>>,
+
+  /**
+   * Prefix for generated Bazel workspaces (from workspace_rules)
+   *
+   * TODO(acmcarther): Does this have a non-bazel analogue?
+   */
+  #[serde(default = "default_gen_workspace_prefix")]
+  pub gen_workspace_prefix: String
 }
 
 fn default_target() -> String {
   "x86_64-unknown-linux-gnu".to_owned()
+}
+
+fn default_gen_workspace_prefix() -> String {
+  "raze".to_owned()
 }
 
 #[derive(Debug, Clone, Deserialize)]

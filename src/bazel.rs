@@ -38,35 +38,35 @@ impl BazelRenderer {
 
   pub fn render_crate(&self, workspace_context: &WorkspaceContext, package: &CrateContext) -> Result<String, tera::Error> {
     let mut context = Context::new();
-    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("workspace", &workspace_context);
     context.add("crate", &package);
     self.internal_renderer.render("templates/crate.BUILD.template", &context)
   }
 
   pub fn render_aliases(&self, workspace_context: &WorkspaceContext, all_packages: &Vec<CrateContext>) -> Result<String, tera::Error> {
     let mut context = Context::new();
-    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("workspace", &workspace_context);
     context.add("crates", &all_packages);
     self.internal_renderer.render("templates/workspace.BUILD.template", &context)
   }
 
   pub fn render_remote_crate(&self, workspace_context: &WorkspaceContext, package: &CrateContext) -> Result<String, tera::Error> {
     let mut context = Context::new();
-    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("workspace", &workspace_context);
     context.add("crate", &package);
     self.internal_renderer.render("templates/remote_crate.BUILD.template", &context)
   }
 
   pub fn render_remote_aliases(&self, workspace_context: &WorkspaceContext, all_packages: &Vec<CrateContext>) -> Result<String, tera::Error> {
     let mut context = Context::new();
-    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("workspace", &workspace_context);
     context.add("crates", &all_packages);
     self.internal_renderer.render("templates/remote_workspace.BUILD.template", &context)
   }
 
   pub fn render_bzl_fetch(&self, workspace_context: &WorkspaceContext, all_packages: &Vec<CrateContext>) -> Result<String, tera::Error> {
     let mut context = Context::new();
-    context.add("path_prefix", &workspace_context.workspace_prefix);
+    context.add("workspace", &workspace_context);
     context.add("crates", &all_packages);
     self.internal_renderer.render("templates/remote_crates.bzl.template", &context)
   }
@@ -132,8 +132,9 @@ mod tests {
   fn dummy_planned_build(crate_contexts: Vec<CrateContext>) -> PlannedBuild {
     PlannedBuild {
       workspace_context: WorkspaceContext {
-        workspace_prefix: "//workspace/prefix".to_owned(),
+        workspace_path: "//workspace/prefix".to_owned(),
         platform_triple: "irrelevant".to_owned(),
+        gen_workspace_prefix: "".to_owned()
       },
       crate_contexts: crate_contexts,
     }

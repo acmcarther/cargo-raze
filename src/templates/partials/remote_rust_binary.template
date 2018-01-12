@@ -1,4 +1,4 @@
-{% set target_name_sanitized = target.name | replace(from="-", to="_") %}
+{%- set target_name_sanitized = target.name | replace(from="-", to="_") %}
 rust_binary(
     # Prefix bin name to disambiguate from (probable) collision with lib name
     # N.B.: The exact form of this is subject to change.
@@ -8,26 +8,26 @@ rust_binary(
     deps = [
         # Binaries get an implicit dependency on their lib
         ":{{crate.pkg_name | replace(from="-", to="_") }}",
-        {% for dependency in crate.dependencies %}
-        "@{{dependency.name | slugify | replace(from="-", to="_")}}{{dependency.version | slugify | replace(from="-", to="_")}}//:{{dependency.name | replace(from="-", to="_") }}",
-        {% endfor %}
-        {% for dependency in crate.additional_deps %}
+        {%- for dependency in crate.dependencies %}
+        "@{{workspace.gen_workspace_prefix}}__{{dependency.name | slugify | replace(from="-", to="_")}}__{{dependency.version | slugify | replace(from="-", to="_")}}//:{{dependency.name | replace(from="-", to="_") }}",
+        {%- endfor %}
+        {%- for dependency in crate.additional_deps %}
         "{{dependency}}",
-        {% endfor %}
+        {%- endfor %}
     ],
     rustc_flags = [
         "--cap-lints allow",
         "--target={{crate.platform_triple}}",
-        {% for flag in crate.additional_flags %}
+        {%- for flag in crate.additional_flags %}
         "{{flag}}",
-        {% endfor %}
+        {%- endfor %}
     ],
-    {% if crate.build_script_target %}
+    {%- if crate.build_script_target %}
     out_dir_tar = ":{{ crate.pkg_name | replace(from="-", to="_")}}_build_script_executor",
-    {% endif %}
+    {%- endif %}
     crate_features = [
-        {% for feature in crate.features %}
+        {%- for feature in crate.features %}
         "{{feature}}",
-        {% endfor %}
+        {%- endfor %}
     ],
 )
