@@ -33,7 +33,7 @@ genrule(
     tools = [":{{ crate_name_sanitized  }}_build_script"],
     local = 1,
     cmd = "mkdir {{ crate_name_sanitized}}_out_dir_outputs/;"
-        + " (export CARGO_MANIFEST_DIR=\"$$PWD/{{crate.pkg_name | slugify | replace(from="-", to="_")}}{{crate.pkg_version | slugify | replace(from="-", to="_")}}\";"
+        + " (export CARGO_MANIFEST_DIR=\"$$PWD/$$(dirname $(location :Cargo.toml))\";"
         + " export TARGET='{{ crate.platform_triple }}';"
         + " export RUST_BACKTRACE=1;"
         {%- for feature in crate.features %}

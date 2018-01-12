@@ -41,8 +41,14 @@ pub struct CrateContext {
 pub struct WorkspaceContext {
   /** The bazel path prefix to the vendor directory */
   pub workspace_path: String,
+
   /** The compilation target triple */
   pub platform_triple: String,
-  /** The generated new_http_library Bazel workspace prefix */
+
+  /**
+   * The generated new_http_library Bazel workspace prefix.
+   *
+   * This has no effect unless the GenMode setting is Remote.
+   */
   pub gen_workspace_prefix: String
 }

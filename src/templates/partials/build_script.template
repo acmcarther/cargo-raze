@@ -9,24 +9,20 @@ rust_binary(
     data = glob([
       "*"
     ]),
-    {% if crate.dependencies | length > 0 or crate.build_dependencies | length > 0 %}
     deps = [
       {% for dependency in crate.build_dependencies %}
         "{{workspace.workspace_path}}/vendor/{{dependency.name}}-{{dependency.version}}:{{dependency.name | replace(from="-", to="_") }}",
       {% endfor %}
     ],
-    {% endif %}
     rustc_flags = [
         "--cap-lints allow",
         "--target={{crate.platform_triple}}",
     ],
-    {% if crate.features | length > 0 %}
     crate_features = [
       {% for feature in crate.features %}
       "{{feature}}",
       {% endfor %}
     ],
-    {% endif %}
     visibility = ["//visibility:private"],
 )
 

@@ -18,6 +18,7 @@ use context::BuildTarget;
 use context::CrateContext;
 use context::WorkspaceContext;
 use settings::RazeSettings;
+use settings::GenMode;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -84,10 +85,11 @@ impl <'a>  BuildPlanner<'a> {
           let path = format!("./vendor/{}-{}/", id.name(), id.version());
 
           // Verify that package is really vendored
-          /*
-          try!(fs::metadata(&path).map_err(|_| {
-              CargoError::from(format!("failed to find {}. Please run `cargo vendor -x` first.", &path))
-          }));*/
+          if self.settings.genmode == GenMode::Vendored {
+            try!(fs::metadata(&path).map_err(|_| {
+                CargoError::from(format!("failed to find {}. Either switch to \"Remote\" genmode, or run `cargo vendor -x` first.", &path))
+            }));
+          }
 
           // Identify all possible dependencies
           let PlannedDeps { mut build_deps, mut dev_deps, mut normal_deps } =
@@ -158,6 +160,9 @@ impl <'a>  BuildPlanner<'a> {
         platform_triple: self.settings.target.clone(),
         gen_workspace_prefix: self.settings.gen_workspace_prefix.clone(),
       };
+
+      crate_contexts.sort_by_key(|context| format!("{}-{}", context.pkg_name, context.pkg_version));
+
       Ok(PlannedBuild{
         workspace_context: workspace_context,
         crate_contexts: crate_contexts
