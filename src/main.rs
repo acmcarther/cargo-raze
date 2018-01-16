@@ -1,5 +1,5 @@
 extern crate cargo as __internal_cargo_do_not_use;
-#[macro_use(Deserialize)]
+#[macro_use(Serialize, Deserialize)]
 extern crate serde_derive;
 extern crate serde;
 extern crate itertools;
@@ -15,14 +15,9 @@ extern crate url;
 #[macro_use]
 extern crate hamcrest;
 
-use std::env;
-use std::fs::File;
-use std::path::Path;
-use std::path::PathBuf;
-use std::io::Write;
-use log::LogLevel;
-use util::OkButLog;
-use url::Url;
+mod util;
+mod init;
+mod context;
 
 mod _cargo {
   pub use __internal_cargo_do_not_use::CargoError as Error;
@@ -39,10 +34,26 @@ mod _cargo {
   pub use __internal_cargo_do_not_use::exit_with_error;
   pub use __internal_cargo_do_not_use::core::resolver::Method;
   pub use __internal_cargo_do_not_use::core::resolver;
+  pub use __internal_cargo_do_not_use::core::PackageSet;
+  pub use __internal_cargo_do_not_use::core::Resolve;
   pub use __internal_cargo_do_not_use::ops::resolve_with_previous;
+  pub use __internal_cargo_do_not_use::ops::resolve_ws_precisely;
+  pub use __internal_cargo_do_not_use::ops::Packages;
   pub use __internal_cargo_do_not_use::util::CargoResult as CResult;
   pub use __internal_cargo_do_not_use::util::Config;
+  pub use __internal_cargo_do_not_use::util::Cfg;
 }
+
+use std::env;
+use std::fs::File;
+use std::path::Path;
+use std::path::PathBuf;
+use std::io::Write;
+use util::OkButLog;
+use context::WorkspaceContext;
+use context::CrateContext;
+use context::BuildTarget;
+use context::BuildDependency;
 
 #[derive(Debug, Deserialize)]
 struct Options {
@@ -68,7 +79,7 @@ Options:
     --color WHEN              Coloring: auto, always, never
     --target TARGET           Platform to generate BUILD files for
     -d, --dryrun              Do not emit any files
-    -Z FLAG ...                Unstable (nightly-only) flags to Cargo
+    -Z FLAG ...               Unstable (nightly-only) flags to Cargo
 "#;
 
 fn main() {
@@ -90,171 +101,201 @@ fn cargo_main(options: Options, config: &_cargo::Config) -> _cargo::CliResult {
                         /* locked = */ false,
                         &options.flag_z));
 
+  let target = options.flag_target.unwrap();
+
   let current_dir = env::current_dir().unwrap();
 
-  InitialWorkspace::load_from_fs(&config, current_dir.join(&Path::new("Cargo.toml"))).ok_but_error();
+  let workspace = Workspace::load_from_fs(config, current_dir.join(&Path::new("Cargo.toml"))).unwrap();
+  let r = CargoDependencyResolver::for_workspace(&workspace).unwrap();
+  let attrs = try!(util::fetch_attrs(&target));
+  r.resolve(&target, &attrs);
 
   //debug!("{:#?}", ws);
 
   Ok(())
 }
 
-
-struct InitialWorkspace<'cfg> {
-  manifest_path: PathBuf,
-  raw_manifest: toml::Value,
-  cargo_workspace: _cargo::Workspace<'cfg>,
+trait DependencyResolver {
+  fn resolve(&self, platform_triple: &str, platform_attrs: &Vec<_cargo::Cfg>) -> _cargo::CResult<WorkspaceContext>;
 }
 
-impl<'cfg>  InitialWorkspace<'cfg> {
-  fn load_from_fs(config: &_cargo::Config, manifest_path: PathBuf) -> _cargo::CResult<()> /*InitialWorkspace<'cfg>>*/ {
-    let ws = try!(_cargo::Workspace::new(&manifest_path, config));
-    let mut registry = PromotedDevDependencyRegistry {
-      inner_registry: try!(_cargo::PackageRegistry::new(&ws.config()))
-    };
+struct CargoDependencyResolver<'cfg> {
+  cargo_workspace: _cargo::Workspace<'cfg>
+}
 
-    let mut summaries = Vec::new();
+impl <'cfg> CargoDependencyResolver<'cfg> {
+  pub fn for_workspace(workspace: &Workspace<'cfg>) -> _cargo::CResult<CargoDependencyResolver<'cfg>> {
+    let cargo_workspace = try!(_cargo::Workspace::ephemeral(
+      workspace.cargo_package.clone(),
+      workspace.cargo_config,
+      None /* target_dir */,
+      true /* require_optional_deps */,
+    ));
 
-    for (url, patches) in ws.root_patch() {
-        registry.patch(url, patches)?;
+    Ok(CargoDependencyResolver {
+      cargo_workspace: cargo_workspace
+    })
+  }
+
+  pub fn resolve_using_network(&self,
+                               platform_triple: &str,
+                               platform_attrs: &Vec<_cargo::Cfg>) -> _cargo::CResult<WorkspaceContext> {
+    let specs = try!(_cargo::Packages::All.into_package_id_specs(&self.cargo_workspace));
+
+    // TODO(acmcarther): Figure out how to do this without network
+    let (packages, resolve) = try!(_cargo::resolve_ws_precisely(
+      &self.cargo_workspace,
+      None,
+      &[],
+      false,
+      false,
+      &specs));
+
+    let root_crate_name = specs.iter()
+      .next()
+      .unwrap()
+      .name()
+      .to_owned();
+
+    self.resolve_directly(
+      platform_triple,
+      platform_attrs,
+      &root_crate_name,
+      packages,
+      resolve)
+  }
+
+  pub fn resolve_directly(&self,
+                          platform_triple: &str,
+                          platform_attrs: &Vec<_cargo::Cfg>,
+                          root_crate_name: &str,
+                          packages: _cargo::PackageSet<'cfg>,
+                          resolve: _cargo::Resolve) -> _cargo::CResult<WorkspaceContext> {
+    info!("resolve: {:#?}", resolve);
+    let mut package_ids = resolve.iter().cloned()
+      .filter(|dep| dep.name() != root_name)
+      .collect::<Vec<_>>();
+    package_ids.sort_by_key(|id| id.name());
+
+    let root_package_id = try!(resolve.iter()
+        .filter(|dep| dep.name() == root_name)
+        .next()
+        .ok_or(CargoError::from("root crate should be in cargo resolve")));
+    let root_direct_deps = resolve.deps(&root_package_id).cloned().collect::<HashSet<_>>();
+
+    let mut crates = Vec::new();
+    for id in package_ids {
+      let package = packages.get(&id).unwrap();
+      let dependencies = package
+        .dependencies()
+        .iter()
+        .filter(|dep| {
+          dep.platform()
+              .map(|p| p.matches(&platform_triple, Some(&platform_attrs)))
+              .unwrap_or(true)
+        })
+        .collect::<Vec<_>>();
+
+      let mut build_deps = Vec::new();
+      let mut normal_deps = Vec::new();
+      for dep in dependencies.into_iter() {
+        match dep.kind() {
+          _cargo::Kind::Normal => normal_deps.push(BuildDependency {
+            name: dep.name(),
+            version: dep.version(),
+          }),
+          _cargo::Kind::Build => build_deps.push(BuildDependency {
+            name: dep.name(),
+            version: dep.version().to_string(),
+          }),
+          _ => () /* can't resolve + vendor dev deps, in general */,
+        }
+      }
+
+      let mut build_script_target = None;
+      let mut targets = Vec::new();
+      for cargo_target in package.targets() {
+        let kinds = match cargo_target.kind() {
+            &TargetKind::Lib(ref kinds) => kinds.iter().map(|k| k.crate_type().to_owned()).collect(),
+            &TargetKind::Bin => vec!["bin".to_owned()],
+            &TargetKind::CustomBuild => {
+              build_script_target = Some(BuildTarget {
+                name: cargo_target.name().to_owned(),
+                kind: "custom-build".to_owned(),
+                path: cargo_target.src_path(),
+              });
+              continue
+            }
+            _ => continue /* examples, tests, and benches need dev deps */,
+        };
+
+        for kind in kinds {
+          targets.push(BuildTarget {
+            name: cargo_target.name().to_owned(),
+            kind: kind.to_owned(),
+            path: cargo_target.src_path(),
+          })
+        }
+      }
+
+      crates.push(CrateContext {
+        pkg_name: id.name().to_owned(),
+        pkg_version: id.version().to_owned().to_string(),
+        features: resolve.features(&id).into_iter().cloned().collect::<Vec<_>>(),
+        dependencies: normal_deps,
+        build_dependencies: build_deps,
+        dev_dependencies: Vec::new(),
+        is_root_dependency: root_direct_deps.contains(&id),
+        targets: targets,
+        build_script_target: build_script_target
+      });
     }
 
-    for member in ws.members() {
-      let summary = registry.lock(member.summary().clone());
-      summaries.push((summary, _cargo::Method::Everything));
-    }
+    Ok(WorkspaceContext {
+      crates: Vec::new()
+    })
+  }
+}
 
-    debug!("hello buddy");
+impl <'cfg> DependencyResolver for CargoDependencyResolver<'cfg> {
+  fn resolve(&self, platform_triple: &str, platform_attrs: &Vec<_cargo::Cfg>) -> _cargo::CResult<WorkspaceContext> {
+    self.resolve_using_network(platform_triple, platform_attrs)
+  }
+}
 
-    let mut resolve = _cargo::resolver::resolve(
-                                     &summaries /* summaries */,
-                                     &[] /* replace */,
-                                     &mut registry,
-                                     Some(&ws.config()))?;
-    debug!("where did my buddy go?");
 
-    debug!("{:#?}", resolve);
+struct Workspace<'cfg> {
+  pub manifest_path: PathBuf,
+  pub raw_manifest: toml::Value,
+  pub raw_lock: toml::Value,
+  pub cargo_package: _cargo::Package,
+  pub cargo_config: &'cfg _cargo::Config,
+}
 
+impl <'cfg> Workspace<'cfg> {
+  pub fn load_from_fs(cargo_config: &'cfg _cargo::Config, manifest_path: PathBuf) -> _cargo::CResult<Workspace<'cfg>> {
+    let cargo_package = try!(_cargo::Package::for_path(&manifest_path, &cargo_config));
 
     let manifest_contents =
       try!(util::load_file_forcefully(&manifest_path, "Cargo.toml in current working directory"));
+    let lock_path = manifest_path.parent()
+      .unwrap_or(Path::new("./"))
+      .join("Cargo.lock");
+    let lock_contents =
+      try!(util::load_file_forcefully(&lock_path, "Cargo.lock in same dir as toml"));
+
+    let manifest_toml = try!(manifest_contents.parse::<toml::Value>());
+    let lock_toml = try!(manifest_contents.parse::<toml::Value>());
 
     //debug!("{:#?}", specs);
 
-    Ok(())
-
-    /*
-    InitialWorkspace {
-      manifest_path: manifest_path
-    }
-    */
+    Ok(Workspace {
+      manifest_path: manifest_path,
+      raw_manifest: manifest_toml,
+      raw_lock: lock_toml,
+      cargo_package: cargo_package,
+      cargo_config: cargo_config,
+    })
   }
 }
 
-mod init {
-  use fern;
-  use chrono;
-  use log;
-  use std;
-
-  pub fn global_logger() {
-    fern::Dispatch::new()
-      .format(|out, message, record| {
-          out.finish(format_args!("{} {} [{}] {}",
-              record.level(),
-              chrono::Local::now()
-                  .format("%m%d %H:%M:%S%.6f"),
-              record.target(),
-              message))
-      })
-      .level(log::LogLevelFilter::Debug)
-      .chain(std::io::stdout())
-      .apply().unwrap();
-  }
-}
-
-// TODO(acmcarther): Better Name
-struct PromotedDevDependencyRegistry<'a> {
-  inner_registry: _cargo::PackageRegistry<'a>,
-}
-
-impl <'a> PromotedDevDependencyRegistry<'a> {
-  pub fn lock(&self, summary: _cargo::Summary) -> _cargo::Summary {
-    self.inner_registry.lock(summary)
-  }
-
-  pub fn patch(&mut self, url: &Url, deps: &[_cargo::Dependency]) -> _cargo::CResult<()> {
-    self.inner_registry.patch(url, deps)
-  }
-}
-
-impl <'a> _cargo::Registry for PromotedDevDependencyRegistry<'a> {
-  fn query(&mut self,
-           dep: &_cargo::Dependency,
-           f: &mut FnMut(_cargo::Summary)) -> _cargo::CResult<()> {
-    self.inner_registry.query(
-      dep,
-      &mut |mut summary| {
-        let summary = summary.map_dependencies(|mut dependency| {
-          if dependency.kind() == _cargo::Kind::Development {
-            dependency.set_kind(_cargo::Kind::Normal);
-          }
-          dependency
-        });
-        f(summary)
-      })
-  }
-
-  fn query_vec(&mut self, dep: &_cargo::Dependency) -> _cargo::CResult<Vec<_cargo::Summary>> {
-    let mut ret = Vec::new();
-    self.query(dep, &mut |s| ret.push(s))?;
-    Ok(ret)
-  }
-
-  fn supports_checksums(&self) -> bool {
-    self.inner_registry.supports_checksums()
-  }
-}
-
-mod util {
-  use log::LogLevel;
-  use std::fs::File;
-  use std::path::PathBuf;
-  use std::fmt::Display;
-  use _cargo;
-
-  pub fn load_file_forcefully(path: &PathBuf, file_description: &str) -> _cargo::CResult<String> {
-    use std::io::Read;
-
-    let mut c = String::new();
-    try!(File::open(&path)
-         .map_err(|_| "Failed to find")
-         .and_then(|mut f| f.read_to_string(&mut c).map_err(|_| "Failed to load"))
-         .map_err(|e| _cargo::Error::from(format!("{} {}", e, file_description))));
-    trace!("Successfully loaded {}", file_description);
-    Ok(c)
-  }
-
-  macro_rules! decl_ok_but {
-    ($fn_ident:ident, $log_level:expr) => (
-      fn $fn_ident(self) -> Option<T> {
-        self.ok_but($log_level)
-      }
-    )
-  }
-
-  pub trait OkButLog<T> : Sized {
-    fn ok_but(self, level: LogLevel) -> Option<T>;
-    decl_ok_but!(ok_but_error, LogLevel::Error);
-    decl_ok_but!(ok_but_warn, LogLevel::Warn);
-    decl_ok_but!(ok_but_info, LogLevel::Info);
-    decl_ok_but!(ok_but_debug, LogLevel::Debug);
-    decl_ok_but!(ok_but_trace, LogLevel::Trace);
-  }
-
-  impl <T, U : Display> OkButLog<T> for Result<T, U> {
-    fn ok_but(self, level: LogLevel) -> Option<T> {
-      self.map_err(|e| log!(level, "{}", e)).ok()
-    }
-  }
-}
