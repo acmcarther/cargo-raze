@@ -28,6 +28,7 @@ use rendering::FileOutputs;
 use rendering::BuildRenderer;
 use rendering::RenderDetails;
 use settings::RazeSettings;
+use settings::GenMode;
 use std::env;
 use std::fs::File;
 use std::path::Path;
@@ -81,7 +82,7 @@ fn real_main(options: Options, cargo_config: &Config) -> CliResult {
 
   try!(validate_settings(&mut settings));
 
-  let mut planner = try!(BuildPlanner::new(settings, cargo_config));
+  let mut planner = try!(BuildPlanner::new(settings.clone(), cargo_config));
 
   if let Some(host) = options.flag_host {
     try!(planner.set_registry_from_url(host));
@@ -94,7 +95,11 @@ fn real_main(options: Options, cargo_config: &Config) -> CliResult {
     path_prefix: "./".to_owned(),
   };
 
-  let bazel_file_outputs = try!(bazel_renderer.render_planned_build(&render_details, &planned_build));
+  let bazel_file_outputs = match settings.genmode {
+    GenMode::Vendored => try!(bazel_renderer.render_planned_build(&render_details, &planned_build)),
+    GenMode::Remote => try!(bazel_renderer.render_remote_planned_build(&render_details, &planned_build)),
+    /* exhaustive, we control the definition */
+  };
 
   let dry_run = options.flag_dryrun.unwrap_or(false);
   for FileOutputs { path, contents } in bazel_file_outputs {
