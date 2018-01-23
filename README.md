@@ -32,16 +32,16 @@ To use Raze, you'll need to:
 
 1. Set up your WORKSPACE to contain Rust rules
 2. If Vendoring:
-    a. Set up your cargo/ directory for vendoring
-    b. Install cargo-vendor, and cargo-raze
-    c. Generate your lock file
-    d. Vendor your dependencies
-    e. Generate your BUILD files into the vendored directories
+    1. Set up your cargo/ directory for vendoring
+    2. Install cargo-vendor, and cargo-raze
+    3. Generate your lock file
+    4. Vendor your dependencies
+    5. Generate your BUILD files into the vendored directories
 3. If not vendoring
-    a. Set up your cargo/ directory for remote dependencies
-    b. Install cargo-raze
-    c. Generate your BUILD files
-    d. Add the crate fetching snippet into your WORKSPACE file.
+    1. Set up your cargo/ directory for remote dependencies
+    2. Install cargo-raze
+    3. Generate your BUILD files
+    4. Add the crate fetching snippet into your WORKSPACE file.
 
 See below for individual step details
 
