@@ -1,5 +1,8 @@
 # cargo raze
 
+## NOTE: Repo defunct: Development continues under google/cargo-raze!
+Please see http://github.com/google/cargo-raze!
+
 [![Build Status](https://travis-ci.org/acmcarther/cargo-raze.svg?branch=master)](https://travis-ci.org/acmcarther/cargo-raze)
 
 A cargo subcommand to generate platform-specific BUILD files.
